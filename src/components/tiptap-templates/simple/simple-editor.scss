@@ -26,7 +26,8 @@ body,
   background-color: var(--tt-bg-color);
 }
 
-body {
+/* Only hide overflow for editor-specific containers */
+.simple-editor-container {
   overflow: hidden;
 }
 

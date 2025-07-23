@@ -4,6 +4,8 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { LeadForm } from "./LeadForm";
+import { PDFViewer } from "./PDFViewer";
+import { TipTapContentViewer } from "./TipTapContentViewer";
 
 interface LeadMagnetDetailsProps {
   magnetId: Id<"leadMagnets">;
@@ -369,22 +371,19 @@ export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) 
 
         {magnet.type === "pdf" && magnet.fileUrl && (
           <div className="mt-4">
-            <a
-              href={magnet.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 underline"
-            >
-              View PDF →
-            </a>
+            <PDFViewer 
+              fileUrl={magnet.fileUrl} 
+              title={magnet.title}
+              className="w-full"
+            />
           </div>
         )}
 
         {magnet.type === "scratch" && magnet.content && (
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium mb-2">Content Preview:</h3>
-            <div className="text-sm text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto">
-              {magnet.content}
+            <div className="text-sm text-gray-700 max-h-40 overflow-y-auto flex justify-center">
+              <TipTapContentViewer content={magnet.content} />
             </div>
           </div>
         )}

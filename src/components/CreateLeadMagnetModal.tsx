@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
-import { TipTapEditor } from "./TipTapEditor";
+import { SimpleEditor } from "./tiptap-templates/simple/simple-editor";
 
 interface CreateLeadMagnetModalProps {
   onClose: () => void;
@@ -293,11 +293,12 @@ export function CreateLeadMagnetModal({ onClose }: CreateLeadMagnetModalProps) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Content
                   </label>
-                  <TipTapEditor
-                    content={content}
-                    onChange={setContent}
-                    placeholder="Start writing your lead magnet content..."
-                  />
+                  <div className="simple-editor-container">
+                    <SimpleEditor
+                      initialContent={content}
+                      onChange={setContent}
+                    />
+                  </div>
                 </div>
               )}
 

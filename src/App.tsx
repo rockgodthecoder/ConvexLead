@@ -62,7 +62,7 @@ function MainApp() {
           </Authenticated>
         </header>
         
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-8 overflow-y-auto">
           <Content currentView={currentView} />
         </main>
       </div>

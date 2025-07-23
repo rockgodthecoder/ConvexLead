@@ -198,11 +198,13 @@ const MobileToolbarContent = ({
 
 interface SimpleEditorProps {
   initialContent?: any;
+  content?: string;
   onChange?: (content: string) => void;
 }
 
 export function SimpleEditor({
   initialContent,
+  content,
   onChange,
 }: SimpleEditorProps = {}) {
   const isMobile = useIsMobile();
@@ -233,7 +235,6 @@ export function SimpleEditor({
       Typography,
       Superscript,
       Subscript,
-
       Selection,
       ImageUploadNode.configure({
         accept: "image/*",
@@ -244,8 +245,6 @@ export function SimpleEditor({
       }),
       TrailingNode,
       Link.configure({ openOnClick: false }),
-
-      // Enhanced Extensions
       SlashCommand.configure({
         suggestion: {
           items: getSuggestionItems,
@@ -258,13 +257,23 @@ export function SimpleEditor({
       AutoLink,
       MarkdownShortcuts,
     ],
-    content: initialContent || defaultContent,
+    content: content ?? initialContent ?? defaultContent,
     onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
       if (onChange) {
-        onChange(editor.getHTML());
+        console.log('SimpleEditor onChange:', html);
+        onChange(html);
       }
     },
   });
+
+  // Keep editor in sync with content prop
+  React.useEffect(() => {
+    if (editor && typeof content === "string" && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+    // eslint-disable-next-line
+  }, [content]);
 
   const bodyRect = useCursorVisibility({
     editor,

@@ -13,6 +13,8 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as analytics from "../analytics.js";
+import type * as analyticsInternal from "../analyticsInternal.js";
 import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as leadMagnets from "../leadMagnets.js";
@@ -28,6 +30,8 @@ import type * as router from "../router.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  analytics: typeof analytics;
+  analyticsInternal: typeof analyticsInternal;
   auth: typeof auth;
   http: typeof http;
   leadMagnets: typeof leadMagnets;

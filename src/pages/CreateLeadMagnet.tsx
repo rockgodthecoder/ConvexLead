@@ -79,6 +79,7 @@ export function CreateLeadMagnet() {
       // Handle file upload for PDF and HTML
       if ((type === "pdf" || type === "html") && selectedFile) {
         const uploadUrl = await generateUploadUrl();
+        console.log("Upload URL:", uploadUrl);
         const result = await fetch(uploadUrl, {
           method: "POST",
           headers: { "Content-Type": selectedFile.type },
@@ -86,7 +87,17 @@ export function CreateLeadMagnet() {
         });
 
         if (!result.ok) {
-          throw new Error("Failed to upload file");
+          const errorText = await result.text();
+          console.error("Failed to upload file:", result.status, errorText);
+          if (result.status === 412) {
+            toast.error("Upload failed: The upload URL expired or was used twice. Please try again.");
+          } else if (result.status === 413) {
+            toast.error("Upload failed: File is too large.");
+          } else {
+            toast.error("Failed to upload file: " + result.status);
+          }
+          setIsUploading(false);
+          return;
         }
 
         const { storageId } = await result.json();
@@ -98,6 +109,7 @@ export function CreateLeadMagnet() {
         }
       }
 
+      console.log('Content to save:', finalContent);
       await createLeadMagnet({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -355,8 +367,8 @@ export function CreateLeadMagnet() {
                     <label className="block text-sm font-medium text-gray-700 mb-4">
                       Content
                     </label>
-                    <div className="border border-gray-300 rounded-lg overflow-hidden">
-                      <SimpleEditor />
+                    <div className="border border-gray-300 rounded-lg overflow-hidden simple-editor-container">
+                      <SimpleEditor initialContent={content} onChange={(val) => { console.log('Editor onChange:', val); setContent(val); }} />
                     </div>
                   </div>
                 )}

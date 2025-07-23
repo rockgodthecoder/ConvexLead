@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
 :root {
   --color-light: #ffffff;
   --color-dark: #171717;
@@ -30,6 +32,7 @@ body {
     "Noto Color Emoji";
   color: var(--color-dark);
   background: var(--color-light);
+  overflow-y: auto;
 }
 
 /* only use this to update the style of the auth input fields. use a different class for all other input fields */
@@ -40,4 +43,118 @@ body {
 /* only use this to update the style of the auth buttons. use the button class for all other buttons */
 .auth-button {
   @apply w-full px-4 py-3 rounded bg-primary text-white font-semibold hover:bg-primary-hover transition-colors shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* TipTap Content Viewer Styles */
+.tiptap-content-viewer {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.tiptap-content-viewer .ProseMirror {
+  outline: none;
+  padding: 3rem 3rem;
+  font-family: "DM Sans", sans-serif;
+}
+
+.tiptap-content-viewer .ProseMirror p {
+  margin: 0.5em 0;
+}
+
+.tiptap-content-viewer .ProseMirror h1,
+.tiptap-content-viewer .ProseMirror h2,
+.tiptap-content-viewer .ProseMirror h3,
+.tiptap-content-viewer .ProseMirror h4,
+.tiptap-content-viewer .ProseMirror h5,
+.tiptap-content-viewer .ProseMirror h6 {
+  margin: 1em 0 0.5em 0;
+  font-weight: 600;
+}
+
+.tiptap-content-viewer .ProseMirror h1 {
+  font-size: 1.5em;
+}
+
+.tiptap-content-viewer .ProseMirror h2 {
+  font-size: 1.3em;
+}
+
+.tiptap-content-viewer .ProseMirror h3 {
+  font-size: 1.1em;
+}
+
+.tiptap-content-viewer .ProseMirror ul,
+.tiptap-content-viewer .ProseMirror ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.tiptap-content-viewer .ProseMirror li {
+  margin: 0.25em 0;
+}
+
+.tiptap-content-viewer .ProseMirror blockquote {
+  border-left: 3px solid #e5e7eb;
+  margin: 1em 0;
+  padding-left: 1em;
+  font-style: italic;
+  color: #6b7280;
+}
+
+.tiptap-content-viewer .ProseMirror code {
+  background-color: #f3f4f6;
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+  font-family: monospace;
+  font-size: 0.875em;
+}
+
+.tiptap-content-viewer .ProseMirror pre {
+  background-color: #f3f4f6;
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.tiptap-content-viewer .ProseMirror pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.tiptap-content-viewer .ProseMirror a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.tiptap-content-viewer .ProseMirror a:hover {
+  color: #2563eb;
+}
+
+.tiptap-content-viewer .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  margin: 1em 0;
+}
+
+.tiptap-content-viewer .ProseMirror mark {
+  background-color: #fef3c7;
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+}
+
+.tiptap-content-viewer .ProseMirror .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Mobile responsive styles to match the editor */
+@media screen and (max-width: 768px) {
+  .tiptap-content-viewer .ProseMirror {
+    padding: 1rem 1.5rem;
+  }
 }
