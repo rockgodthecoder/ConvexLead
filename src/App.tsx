@@ -13,6 +13,7 @@ import { Leads } from "./components/Leads";
 import { Analytics } from "./components/Analytics";
 import { SharePage } from "./components/SharePage";
 import { CreateLeadMagnet } from "./pages/CreateLeadMagnet";
+import { MyPage } from "./components/MyPage";
 
 export default function App() {
   return (
@@ -46,22 +47,22 @@ export default function App() {
 }
 
 function MainApp() {
-  const [currentView, setCurrentView] = useState<"home" | "lead-magnets" | "leads" | "analytics">("home");
+  const [currentView, setCurrentView] = useState<"home" | "lead-magnets" | "leads" | "analytics" | "my-page">("home");
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="h-screen flex bg-gray-50">
       <Authenticated>
         <Sidebar currentView={currentView} onViewChange={setCurrentView} />
       </Authenticated>
-      
-      <div className="flex-1 flex flex-col">
+
+      <div className="flex-1 flex flex-col h-screen">
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-6">
           <h2 className="text-xl font-semibold text-blue-600">Lead Magnet Manager</h2>
           <Authenticated>
             <SignOutButton />
           </Authenticated>
         </header>
-        
+
         <main className="flex-1 p-8 overflow-y-auto">
           <Content currentView={currentView} />
         </main>
@@ -70,7 +71,7 @@ function MainApp() {
   );
 }
 
-function Content({ currentView }: { currentView: "home" | "lead-magnets" | "leads" | "analytics" }) {
+function Content({ currentView }: { currentView: "home" | "lead-magnets" | "leads" | "analytics" | "my-page" }) {
   const loggedInUser = useQuery(api.auth.loggedInUser);
 
   if (loggedInUser === undefined) {
@@ -88,6 +89,7 @@ function Content({ currentView }: { currentView: "home" | "lead-magnets" | "lead
         {currentView === "lead-magnets" && <LeadMagnetDashboard />}
         {currentView === "leads" && <Leads />}
         {currentView === "analytics" && <Analytics />}
+        {currentView === "my-page" && <MyPage />}
       </Authenticated>
       
       <Unauthenticated>

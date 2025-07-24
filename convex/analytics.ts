@@ -19,6 +19,7 @@ export const saveSession = mutation({
     scrollEventCount: v.optional(v.number()),
     scrollEventsFileId: v.optional(v.id("_storage")),
     viewport: v.object({ width: v.number(), height: v.number() }),
+    email: v.optional(v.string()), // <-- add this
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("analyticsSessions", {
@@ -45,6 +46,7 @@ export const saveSessionAnalytics = action({
     scrollEventCount: v.optional(v.number()),
     scrollEventsFileId: v.optional(v.id("_storage")),
     viewport: v.object({ width: v.number(), height: v.number() }),
+    email: v.optional(v.string()), // <-- add this
   },
   handler: async (ctx, args) => {
     // Store session data in analyticsSessions, mark as unprocessed
@@ -194,6 +196,7 @@ export const recordJourneySession = mutation({
     utmCampaign: v.optional(v.string()),
     utmTerm: v.optional(v.string()),
     utmContent: v.optional(v.string()),
+    email: v.optional(v.string()), // <-- add this
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("journeySessions", {
@@ -296,5 +299,28 @@ export const getUserJourneyAnalytics = query({
       .withIndex("by_browser", q => q.eq("browserId", args.browserId))
       .first();
     return analytics || null;
+  },
+});
+
+export const getLeadWatchTime = query({
+  args: {
+    leadMagnetId: v.id("leadMagnets"),
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find all sessions for this document and email
+    const sessions = await ctx.db
+      .query("analyticsSessions")
+      .withIndex("by_document", (q) => q.eq("documentId", args.leadMagnetId))
+      .filter((q) => q.eq(q.field("email"), args.email))
+      .collect();
+    const totalWatchTime = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const lastSession = sessions.length > 0 ? sessions.reduce((a, b) => (a.endTime > b.endTime ? a : b)) : null;
+    return {
+      totalWatchTime,
+      lastWatchTime: lastSession ? lastSession.duration : 0,
+      lastWatchedAt: lastSession ? lastSession.endTime : null,
+      sessionCount: sessions.length,
+    };
   },
 }); 

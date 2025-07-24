@@ -26,6 +26,7 @@ export function useJourneyTracking({
   documentTitle,
   pageName,
   userId,
+  email,
   utmSource,
   utmMedium,
   utmCampaign,
@@ -36,6 +37,7 @@ export function useJourneyTracking({
   documentTitle?: string;
   pageName?: string;
   userId?: string;
+  email?: string;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -74,6 +76,7 @@ export function useJourneyTracking({
         utmCampaign,
         utmTerm,
         utmContent,
+        email,
       });
     }
 
@@ -83,5 +86,5 @@ export function useJourneyTracking({
       window.removeEventListener("beforeunload", sendSession);
     };
     // eslint-disable-next-line
-  }, [documentId, documentTitle, pageName, userId, utmSource, utmMedium, utmCampaign, utmTerm, utmContent]);
+  }, [documentId, documentTitle, pageName, userId, email, utmSource, utmMedium, utmCampaign, utmTerm, utmContent]);
 } 

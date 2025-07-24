@@ -3,10 +3,67 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
+// Remove: import { Dialog } from "@radix-ui/react-dialog";
+
+function formatDuration(seconds: number): string {
+  if (!seconds) return "-";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatDate(timestamp: number): string {
+  if (!timestamp) return "-";
+  return new Date(timestamp).toLocaleDateString();
+}
+
+function LeadMagnetsModal({ email, onClose }: { email: string; onClose: () => void }) {
+  // Placeholder: Replace with actual query when backend is ready
+  // const { data, isLoading } = useQuery(api.leads.getLeadMagnetsForLead, { email });
+  const isLoading = false;
+  const data = [
+    { magnetId: "1", title: "Ebook.pdf", totalWatchTime: 510, lastInteraction: Date.now() },
+    { magnetId: "2", title: "Checklist", totalWatchTime: 240, lastInteraction: Date.now() - 86400000 },
+  ];
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Lead Magnets for {email}</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+        </div>
+        {isLoading ? (
+          <div className="py-8 text-center">Loading...</div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200 mt-4">
+            <thead>
+              <tr>
+                <th className="text-left py-2 px-2">Title</th>
+                <th className="text-left py-2 px-2">Total Read Time</th>
+                <th className="text-left py-2 px-2">Last Read</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((magnet) => (
+                <tr key={magnet.magnetId}>
+                  <td className="py-2 px-2">{magnet.title}</td>
+                  <td className="py-2 px-2">{formatDuration(magnet.totalWatchTime)}</td>
+                  <td className="py-2 px-2">{formatDate(magnet.lastInteraction)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
+  );
+}
 
 export function Leads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMagnet, setSelectedMagnet] = useState<string>("all");
+  const [selectedLeadEmail, setSelectedLeadEmail] = useState<string | null>(null);
   
   const leadMagnets = useQuery(api.leadMagnets.list);
   const allLeads = useQuery(api.leads.listAll);
@@ -214,6 +271,7 @@ export function Leads() {
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Lead Magnet</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Magnets</th>
                 </tr>
               </thead>
               <tbody>
@@ -267,6 +325,14 @@ export function Leads() {
                         Delete
                       </button>
                     </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => setSelectedLeadEmail(lead.email)}
+                        className="text-blue-600 hover:text-blue-800 text-sm underline"
+                      >
+                        View Magnets
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -274,6 +340,9 @@ export function Leads() {
           </div>
         )}
       </div>
+      {selectedLeadEmail && (
+        <LeadMagnetsModal email={selectedLeadEmail} onClose={() => setSelectedLeadEmail(null)} />
+      )}
     </div>
   );
 }

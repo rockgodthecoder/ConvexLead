@@ -56,6 +56,7 @@ const applicationTables = {
     viewport: v.object({ width: v.number(), height: v.number() }),
     processed: v.optional(v.boolean()),
     createdAt: v.number(),
+    email: v.optional(v.string()), // <-- add this line
   })
     .index("by_document", ["documentId"])
     .index("by_browser", ["browserId"])
@@ -116,6 +117,7 @@ const applicationTables = {
     utmCampaign: v.optional(v.string()),
     utmTerm: v.optional(v.string()),
     utmContent: v.optional(v.string()),
+    email: v.optional(v.string()), // <-- add this
     createdAt: v.number(),
   })
     .index("by_browser", ["browserId"])

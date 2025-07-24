@@ -3,11 +3,33 @@ import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import { HeatmapAnalytics } from "./HeatmapAnalytics";
 
+function formatDuration(seconds: number) {
+  if (!seconds || seconds < 1) return "0s";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return [
+    h > 0 ? `${h}h` : null,
+    m > 0 ? `${m}m` : null,
+    s > 0 && h === 0 ? `${s}s` : null,
+  ].filter(Boolean).join(" ");
+}
+
 export function Analytics() {
   const [activeTab, setActiveTab] = useState<'overview' | 'heatmap'>('overview');
   const [selectedMagnet, setSelectedMagnet] = useState<string | null>(null);
   
   const leadMagnets = useQuery(api.leadMagnets.list);
+
+  // Only declare topPerformer once
+  const topPerformer = leadMagnets && leadMagnets.length > 0 
+    ? leadMagnets.reduce((top, magnet) => 
+        magnet.leadsCount > top.leadsCount ? magnet : top)
+    : null;
+  const topAnalytics = useQuery(
+    api.analytics.getDocumentAnalytics,
+    topPerformer ? { documentId: topPerformer._id } : "skip"
+  );
 
   if (leadMagnets === undefined) {
     return (
@@ -23,10 +45,6 @@ export function Analytics() {
   
   // Calculate performance metrics
   const avgLeadsPerMagnet = leadMagnets.length > 0 ? Math.round(totalLeads / leadMagnets.length) : 0;
-  const topPerformer = leadMagnets.length > 0 
-    ? leadMagnets.reduce((top, magnet) => 
-        magnet.leadsCount > top.leadsCount ? magnet : top)
-    : null;
 
   // Group by type
   const typeStats = leadMagnets.reduce((acc, magnet) => {
@@ -203,6 +221,34 @@ export function Analytics() {
                 </div>
                 <div className="bg-purple-100 p-3 rounded-full">
                   <span className="text-2xl">📊</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Time Watched</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {topAnalytics ? formatDuration(topAnalytics.totalTimeSpent) : "-"}
+                  </p>
+                </div>
+                <div className="bg-yellow-100 p-3 rounded-full">
+                  <span className="text-2xl">⏱️</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avg Session Duration</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {topAnalytics && topAnalytics.totalSessions > 0
+                      ? formatDuration(Math.round(topAnalytics.totalTimeSpent / topAnalytics.totalSessions))
+                      : "-"}
+                  </p>
+                </div>
+                <div className="bg-orange-100 p-3 rounded-full">
+                  <span className="text-2xl">🕒</span>
                 </div>
               </div>
             </div>
