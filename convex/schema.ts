@@ -111,76 +111,7 @@ const applicationTables = {
     .index("by_document_and_timerange", ["documentId", "timeRange"])
     .index("by_document", ["documentId"]),
 
-  // --- User Journey & Sales Intelligence Tables ---
-  journeySessions: defineTable({
-    browserId: v.string(),
-    sessionId: v.string(),
-    userId: v.optional(v.string()),
-    documentId: v.id("leadMagnets"),
-    documentTitle: v.optional(v.string()),
-    pageName: v.optional(v.string()),
-    pathname: v.string(),
-    referrer: v.optional(v.string()),
-    previousPage: v.optional(v.string()),
-    userAgent: v.string(),
-    viewport: v.object({ width: v.number(), height: v.number() }),
-    startTime: v.number(),
-    endTime: v.number(),
-    duration: v.number(),
-    utmSource: v.optional(v.string()),
-    utmMedium: v.optional(v.string()),
-    utmCampaign: v.optional(v.string()),
-    utmTerm: v.optional(v.string()),
-    utmContent: v.optional(v.string()),
-    email: v.optional(v.string()), // <-- add this
-    createdAt: v.number(),
-  })
-    .index("by_browser", ["browserId"])
-    .index("by_document", ["documentId"])
-    .index("by_session", ["sessionId"])
-    .index("by_document_and_time", ["documentId", "startTime"]),
 
-  // Aggregated user journey analytics (for sales intelligence)
-  userJourneyAnalytics: defineTable({
-    browserId: v.string(),
-    userId: v.optional(v.string()),
-    totalSessions: v.number(),
-    uniqueDocuments: v.number(),
-    totalDuration: v.number(),
-    averageDuration: v.number(),
-    engagementLevel: v.string(),
-    engagementScore: v.number(),
-    topDocuments: v.array(v.object({
-      documentId: v.id("leadMagnets"),
-      documentTitle: v.string(),
-      sessions: v.number(),
-      totalDuration: v.number(),
-      totalScrollDepth: v.number(),
-      firstVisit: v.number(),
-      lastVisit: v.number(),
-      averageEngagement: v.number(),
-    })),
-    allDocuments: v.array(v.object({
-      documentId: v.id("leadMagnets"),
-      documentTitle: v.string(),
-      sessions: v.number(),
-      totalDuration: v.number(),
-      totalScrollDepth: v.number(),
-      firstVisit: v.number(),
-      lastVisit: v.number(),
-      averageEngagement: v.number(),
-    })),
-    firstVisit: v.number(),
-    lastVisit: v.number(),
-    daysSinceFirstVisit: v.number(),
-    daysSinceLastVisit: v.number(),
-    device: v.string(),
-    userAgent: v.string(),
-    referrer: v.string(),
-    lastUpdated: v.number(),
-  })
-    .index("by_browser", ["browserId"])
-    .index("by_user", ["userId"]),
 };
 
 export default defineSchema({

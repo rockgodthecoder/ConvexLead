@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { TipTapContentViewer } from './TipTapContentViewer';
 import { Id } from '../../convex/_generated/dataModel';
-import { usePDFAnalyticsTracking } from '../hooks/use-pdf-analytics-tracking';
+
 import { useAnalyticsTracking } from '../hooks/use-analytics-tracking';
 import { AnalyticsDemo } from './AnalyticsDemo';
 
@@ -44,25 +44,19 @@ export function UnifiedContentViewer({
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Analytics tracking for all content types
-  const pdfAnalytics = usePDFAnalyticsTracking({
-    documentId: documentId || "temp" as any,
-    containerRef,
-    enabled: !!documentId, // Enable for all content types temporarily
-    userEmail
-  });
-
-  // Main analytics tracking for all content types (disabled for PDF/scratch to avoid duplicates)
   const analyticsState = useAnalyticsTracking({
     documentId: documentId || "temp" as any,
-    enabled: !!documentId, // Enable for all content types temporarily
-    userEmail
+    enabled: !!documentId, // Enable for all content types
+    userEmail,
+    containerRef // Pass container ref for PDF/scratch content
   });
 
-  // Use PDF analytics for PDF/scratch, main analytics for others
-  const activeAnalytics = (type === "pdf" || type === "scratch") ? pdfAnalytics : analyticsState;
+  // Use main analytics for all content types
+  const activeAnalytics = analyticsState;
 
   // Debug logging
   console.log("🔍 UnifiedContentViewer Analytics Debug:", {
+    type,
     isTracking: activeAnalytics.isTracking,
     documentId,
     enabled: !!documentId,
@@ -72,7 +66,12 @@ export function UnifiedContentViewer({
     scrollEventsCount: activeAnalytics.scrollEventsCount,
     isTabVisible: activeAnalytics.isTabVisible,
     showAnalytics,
-    userEmail
+    userEmail,
+    timestamp: Date.now(),
+    analyticsEnabled: !!documentId, // Single analytics hook enabled for all content
+    containerRefExists: !!containerRef.current,
+    content: !!content,
+    fileUrl: !!fileUrl
   });
 
   // Load and convert PDF

@@ -26,6 +26,40 @@ export function AnalyticsDemo({
     scrollRangeTimeData,
 }: AnalyticsDemoProps) {
     const [isVisible, setIsVisible] = useState(true);
+    const [currentTime, setCurrentTime] = useState(timeOnPage);
+
+    // Force update when timeOnPage changes
+    useEffect(() => {
+        setCurrentTime(timeOnPage);
+    }, [timeOnPage]);
+
+    // Real-time update mechanism
+    useEffect(() => {
+        if (!isTracking) return;
+
+        const interval = setInterval(() => {
+            // Force a re-render every second to show updated time
+            setCurrentTime(prev => {
+                const newTime = timeOnPage;
+                if (newTime !== prev) {
+                    console.log(`⏱️ AnalyticsDemo time update: ${prev}s → ${newTime}s`);
+                }
+                return newTime;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isTracking, timeOnPage]);
+
+    // Debug logging to see if props are updating
+    console.log("📊 AnalyticsDemo props update:", {
+        timeOnPage,
+        maxScrollPercentage,
+        currentScrollPercentage,
+        scrollEventsCount,
+        isTracking,
+        isTabVisible
+    });
 
     // Show demo panel immediately
     // useEffect(() => {
@@ -61,7 +95,7 @@ export function AnalyticsDemo({
                 <div className="flex justify-between">
                     <span>Time on page:</span>
                     <span className={`${isTabVisible ? 'text-yellow-300' : 'text-yellow-500'}`}>
-                        {timeOnPage}s {!isTabVisible && '(frozen)'}
+                        {currentTime}s {!isTabVisible && '(frozen)'}
                     </span>
                 </div>
                 <div className="flex justify-between">

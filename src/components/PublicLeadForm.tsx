@@ -4,7 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { UnifiedContentViewer } from "./UnifiedContentViewer";
 import { useAnalyticsTracking } from "../hooks/use-analytics-tracking";
-import { AnalyticsDemo } from "./AnalyticsDemo";
+
 
 interface PublicLeadFormProps {
   shareId: string;
@@ -109,7 +109,7 @@ export function PublicLeadForm({ shareId }: PublicLeadFormProps) {
                 Your information has been submitted successfully.
               </p>
               <p className="text-gray-400 text-xs">
-                You can now access your lead magnet below.
+                You can now access your content below.
               </p>
             </div>
 

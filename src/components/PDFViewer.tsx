@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { usePDFAnalyticsTracking } from '../hooks/use-pdf-analytics-tracking';
 import { Id } from '../../convex/_generated/dataModel';
 
 // Set up PDF.js worker
@@ -69,12 +68,7 @@ export function PDFViewer({ fileUrl, title, className = "", documentId, onScroll
   const containerRef = useRef<HTMLDivElement>(null);
   const startTime = useRef<number>(Date.now());
 
-  // PDF-specific analytics tracking
-  const pdfAnalytics = usePDFAnalyticsTracking({
-    documentId: documentId || "temp" as any,
-    containerRef,
-    enabled: !!documentId
-  });
+
   const lastScrollTime = useRef<number>(Date.now());
   const lastSectionUpdate = useRef<number>(Date.now());
   const currentSection = useRef<number>(0);
@@ -248,7 +242,7 @@ export function PDFViewer({ fileUrl, title, className = "", documentId, onScroll
     }
   }, [scale, pdfDocument]);
 
-  // Scroll tracking is now handled by usePDFAnalyticsTracking hook
+  
 
   const zoomIn = () => {
     setScale(prev => Math.min(prev + 0.5, 4.0));
