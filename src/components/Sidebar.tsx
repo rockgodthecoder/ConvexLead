@@ -3,11 +3,17 @@ import { useState } from "react";
 interface SidebarProps {
   currentView: "home" | "lead-magnets" | "leads" | "analytics" | "my-page";
   onViewChange: (view: "home" | "lead-magnets" | "leads" | "analytics" | "my-page") => void;
+  isCollapsed?: boolean;
+  onCollapseChange?: (collapsed: boolean) => void;
 }
 
-export function Sidebar({ currentView, onViewChange }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export function Sidebar({ currentView, onViewChange, isCollapsed: externalIsCollapsed, onCollapseChange }: SidebarProps) {
+  const [internalIsCollapsed, setInternalIsCollapsed] = useState(false);
   const [showExpandTooltip, setShowExpandTooltip] = useState(false);
+  
+  // Use external state if provided, otherwise use internal state
+  const isCollapsed = externalIsCollapsed !== undefined ? externalIsCollapsed : internalIsCollapsed;
+  const setIsCollapsed = onCollapseChange || setInternalIsCollapsed;
 
   const menuItems = [
     {
@@ -39,7 +45,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
     <div
       className={`bg-white border-r border-gray-200 transition-all duration-300 ${
-        isCollapsed ? 'w-16' : 'w-64'
+      isCollapsed ? 'w-16' : 'w-64'
       } flex flex-col min-h-screen relative`}
       // Remove tooltip logic
     >

@@ -22,22 +22,35 @@ const applicationTables = {
     })),
     // Unique shareable link identifier
     shareId: v.optional(v.string()),
+    // Analytics fields
+    formViews: v.optional(v.number()), // Number of times the form was viewed
   })
     .index("by_user", ["createdBy"])
     .index("by_user_and_active", ["createdBy", "isActive"])
     .index("by_share_id", ["shareId"]),
 
   leads: defineTable({
-    leadMagnetId: v.id("leadMagnets"),
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     phone: v.optional(v.string()),
     company: v.optional(v.string()),
-    notes: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
   })
+    .index("by_email", ["email"])
+    .index("by_created_at", ["createdAt"]),
+
+  leadMagnetEngagements: defineTable({
+    leadId: v.id("leads"),
+    leadMagnetId: v.id("leadMagnets"),
+    firstEngagement: v.number(),
+    lastEngagement: v.number(),
+    totalTimeSpent: v.number(),
+    maxScrollPercentage: v.number(),
+  })
+    .index("by_lead", ["leadId"])
     .index("by_lead_magnet", ["leadMagnetId"])
-    .index("by_email", ["email"]),
+    .index("by_lead_and_magnet", ["leadId", "leadMagnetId"]),
 
   // --- Advanced Analytics Tables ---
   analyticsSessions: defineTable({
@@ -45,6 +58,7 @@ const applicationTables = {
     sessionId: v.string(),
     browserId: v.string(),
     userId: v.optional(v.string()),
+    leadId: v.optional(v.id("leads")),
     userAgent: v.string(),
     referrer: v.optional(v.string()),
     startTime: v.number(),
@@ -56,11 +70,12 @@ const applicationTables = {
     viewport: v.object({ width: v.number(), height: v.number() }),
     processed: v.optional(v.boolean()),
     createdAt: v.number(),
-    email: v.optional(v.string()), // <-- add this line
+    email: v.optional(v.string()),
   })
     .index("by_document", ["documentId"])
     .index("by_browser", ["browserId"])
-    .index("by_document_and_time", ["documentId", "startTime"]),
+    .index("by_document_and_time", ["documentId", "startTime"])
+    .index("by_lead", ["leadId"]),
 
   documentAnalytics: defineTable({
     documentId: v.id("leadMagnets"),

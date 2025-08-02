@@ -1,15 +1,9 @@
-import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// Generate a random share ID
 function generateShareId(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 12; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return Math.random().toString(36).substring(2, 8);
 }
 
 export const list = query({
@@ -23,16 +17,15 @@ export const list = query({
     const leadMagnets = await ctx.db
       .query("leadMagnets")
       .withIndex("by_user", (q) => q.eq("createdBy", userId))
-      .order("desc")
       .collect();
 
-    return Promise.all(
+    return await Promise.all(
       leadMagnets.map(async (magnet) => {
         const leadsCount = await ctx.db
-          .query("leads")
+          .query("leadMagnetEngagements")
           .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", magnet._id))
           .collect()
-          .then((leads) => leads.length);
+          .then((engagements) => engagements.length);
 
         return {
           ...magnet,
@@ -133,7 +126,10 @@ export const update = mutation({
     id: v.id("leadMagnets"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
+    type: v.optional(v.union(v.literal("scratch"), v.literal("pdf"), v.literal("notion"), v.literal("html"))),
     content: v.optional(v.string()),
+    fileId: v.optional(v.id("_storage")),
+    notionUrl: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     fields: v.optional(v.object({
       firstName: v.boolean(),
@@ -151,38 +147,11 @@ export const update = mutation({
 
     const { id, ...updates } = args;
     const magnet = await ctx.db.get(id);
-    
     if (!magnet || magnet.createdBy !== userId) {
       throw new Error("Lead magnet not found or unauthorized");
     }
 
     await ctx.db.patch(id, updates);
-  },
-});
-
-export const regenerateShareId = mutation({
-  args: { id: v.id("leadMagnets") },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const magnet = await ctx.db.get(args.id);
-    if (!magnet || magnet.createdBy !== userId) {
-      throw new Error("Lead magnet not found or unauthorized");
-    }
-
-    // Generate a new unique share ID
-    let shareId = generateShareId();
-    
-    // Ensure the share ID is unique
-    while (await ctx.db.query("leadMagnets").withIndex("by_share_id", (q) => q.eq("shareId", shareId)).first()) {
-      shareId = generateShareId();
-    }
-
-    await ctx.db.patch(args.id, { shareId });
-    return shareId;
   },
 });
 
@@ -199,26 +168,44 @@ export const remove = mutation({
       throw new Error("Lead magnet not found or unauthorized");
     }
 
-    // Delete all associated leads first
-    const leads = await ctx.db
-      .query("leads")
+    // Delete all engagements for this lead magnet
+    const engagements = await ctx.db
+      .query("leadMagnetEngagements")
       .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", args.id))
       .collect();
 
-    for (const lead of leads) {
-      await ctx.db.delete(lead._id);
+    for (const engagement of engagements) {
+      await ctx.db.delete(engagement._id);
     }
 
+    // Delete the lead magnet
     await ctx.db.delete(args.id);
   },
 });
 
 export const generateUploadUrl = mutation({
+  args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
+
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const incrementFormViews = mutation({
+  args: { leadMagnetId: v.id("leadMagnets") },
+  handler: async (ctx, args) => {
+    const magnet = await ctx.db.get(args.leadMagnetId);
+    if (!magnet) {
+      throw new Error("Lead magnet not found");
+    }
+
+    const currentViews = magnet.formViews || 0;
+    await ctx.db.patch(args.leadMagnetId, {
+      formViews: currentViews + 1
+    });
   },
 });

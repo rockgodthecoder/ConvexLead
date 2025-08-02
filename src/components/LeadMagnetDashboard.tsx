@@ -47,7 +47,11 @@ function LeadMagnetListItem({ magnet, onClick }: { magnet: any; onClick: () => v
   );
 }
 
-export function LeadMagnetDashboard() {
+interface LeadMagnetDashboardProps {
+  onCollapseSidebar?: () => void;
+}
+
+export function LeadMagnetDashboard({ onCollapseSidebar }: LeadMagnetDashboardProps) {
   const navigate = useNavigate();
   const [selectedMagnetId, setSelectedMagnetId] = useState<Id<"leadMagnets"> | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -75,6 +79,7 @@ export function LeadMagnetDashboard() {
       <LeadMagnetDetails
         magnetId={selectedMagnetId}
         onBack={() => setSelectedMagnetId(null)}
+        onCollapseSidebar={onCollapseSidebar}
       />
     );
   }
@@ -110,12 +115,12 @@ export function LeadMagnetDashboard() {
           >
             <ListIcon />
           </button>
-          <button
+        <button
             onClick={() => navigate("/create-lead-magnet")}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors ml-4"
-          >
-            Create Lead Magnet
-          </button>
+        >
+          Create Lead Magnet
+        </button>
         </div>
       </div>
 

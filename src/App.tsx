@@ -48,13 +48,19 @@ export default function App() {
 
 function MainApp() {
   const [currentView, setCurrentView] = useState<"home" | "lead-magnets" | "leads" | "analytics" | "my-page">("home");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
     <div className="h-screen flex bg-gray-50">
       <Authenticated>
-        <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+        <Sidebar 
+          currentView={currentView} 
+          onViewChange={setCurrentView}
+          isCollapsed={isSidebarCollapsed}
+          onCollapseChange={setIsSidebarCollapsed}
+        />
       </Authenticated>
-
+      
       <div className="flex-1 flex flex-col h-screen">
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-6">
           <h2 className="text-xl font-semibold text-blue-600">Lead Magnet Manager</h2>
@@ -62,16 +68,16 @@ function MainApp() {
             <SignOutButton />
           </Authenticated>
         </header>
-
+        
         <main className="flex-1 p-8 overflow-y-auto">
-          <Content currentView={currentView} />
+          <Content currentView={currentView} onCollapseSidebar={() => setIsSidebarCollapsed(true)} />
         </main>
       </div>
     </div>
   );
 }
 
-function Content({ currentView }: { currentView: "home" | "lead-magnets" | "leads" | "analytics" | "my-page" }) {
+function Content({ currentView, onCollapseSidebar }: { currentView: "home" | "lead-magnets" | "leads" | "analytics" | "my-page"; onCollapseSidebar: () => void }) {
   const loggedInUser = useQuery(api.auth.loggedInUser);
 
   if (loggedInUser === undefined) {
@@ -86,7 +92,7 @@ function Content({ currentView }: { currentView: "home" | "lead-magnets" | "lead
     <div className="max-w-7xl mx-auto w-full">
       <Authenticated>
         {currentView === "home" && <Home />}
-        {currentView === "lead-magnets" && <LeadMagnetDashboard />}
+        {currentView === "lead-magnets" && <LeadMagnetDashboard onCollapseSidebar={onCollapseSidebar} />}
         {currentView === "leads" && <Leads />}
         {currentView === "analytics" && <Analytics />}
         {currentView === "my-page" && <MyPage />}

@@ -7,10 +7,12 @@ import { LeadForm } from "./LeadForm";
 import { PDFViewer } from "./PDFViewer";
 import { TipTapContentViewer } from "./TipTapContentViewer";
 import { HeatmapAnalytics } from "./HeatmapAnalytics";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface LeadMagnetDetailsProps {
   magnetId: Id<"leadMagnets">;
   onBack: () => void;
+  onCollapseSidebar?: () => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -38,37 +40,211 @@ function LeadWatchTimeCell({ magnetId, email }: { magnetId: Id<'leadMagnets'>, e
   );
 }
 
-export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) {
+// Session Details Modal Component
+interface SessionDetailsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sessionData?: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    totalTimeSpent: number;
+    maxScrollPercentage: number;
+    firstEngagement?: number;
+    lastEngagement?: number;
+  };
+}
+
+function SessionDetailsModal({ isOpen, onClose, sessionData }: SessionDetailsModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0 bg-white z-10">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Session Details</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {sessionData?.firstName && sessionData?.lastName 
+                ? `${sessionData.firstName} ${sessionData.lastName}`
+                : sessionData?.email || 'Unknown User'
+              }
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 flex overflow-y-auto">
+          {/* Left Side - Heatmap */}
+          <div className="w-2/3 p-6 border-r border-gray-200 flex-shrink-0">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Engagement Heatmap</h3>
+              <p className="text-sm text-gray-600">Scroll depth and time spent analysis</p>
+            </div>
+            {/* Heatmap Placeholder */}
+            <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 h-full flex items-center justify-center min-h-[300px]">
+              <div className="text-center">
+                <div className="text-4xl mb-4">🔥</div>
+                <h4 className="text-lg font-medium text-gray-700 mb-2">Heatmap Visualization</h4>
+                <p className="text-sm text-gray-500 max-w-md">
+                  This area will show a detailed heatmap of user engagement, 
+                  including scroll patterns, time spent on each section, 
+                  and interaction hotspots.
+                </p>
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    <strong>Placeholder:</strong> Heatmap will display scroll depth (0-100%) 
+                    with color intensity showing time spent at each position.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Analytics */}
+          <div className="w-1/3 p-6 flex-shrink-0">
+            {/* Session Info */}
+            <div className="mb-6 space-y-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Session Info</h3>
+              <div className="flex flex-col gap-2">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Email</span>
+                  <span className="font-semibold text-gray-900">{sessionData?.email || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">First Name</span>
+                  <span className="font-semibold text-gray-900">{sessionData?.firstName || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Last Name</span>
+                  <span className="font-semibold text-gray-900">{sessionData?.lastName || '-'}</span>
+                </div>
+              </div>
+            </div>
+            {/* Total Time Spent */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Total Time Spent</h3>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="text-3xl font-bold text-blue-600 mb-1">
+                  {sessionData?.totalTimeSpent ? Math.round(sessionData.totalTimeSpent / 60) : 0}m {sessionData?.totalTimeSpent ? sessionData.totalTimeSpent % 60 : 0}s
+                </div>
+                <div className="text-sm text-blue-700">
+                  Active reading time
+                </div>
+              </div>
+            </div>
+            {/* Last Engagement Only */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Last Engagement</h3>
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">Date</span>
+                <span className="font-semibold text-gray-900">
+                  {sessionData?.lastEngagement 
+                    ? new Date(sessionData.lastEngagement).toLocaleDateString()
+                    : 'N/A'
+                  }
+                </span>
+              </div>
+            </div>
+            {/* AI Summary */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">AI Summary</h3>
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">AI</span>
+                  </div>
+                  <span className="text-sm font-medium text-purple-700">Engagement Analysis</span>
+                </div>
+                <div className="text-sm text-gray-700 space-y-2">
+                  <p>
+                    <strong>Reading Pattern:</strong> This user showed {sessionData?.maxScrollPercentage && sessionData.maxScrollPercentage > 75 ? 'high' : sessionData?.maxScrollPercentage && sessionData.maxScrollPercentage > 50 ? 'moderate' : 'low'} engagement, 
+                    reaching {sessionData?.maxScrollPercentage || 0}% of the content.
+                  </p>
+                  <p>
+                    <strong>Time Investment:</strong> Spent {sessionData?.totalTimeSpent ? Math.round(sessionData.totalTimeSpent / 60) : 0} minutes actively reading, 
+                    indicating {sessionData?.totalTimeSpent && sessionData.totalTimeSpent > 300 ? 'strong' : sessionData?.totalTimeSpent && sessionData.totalTimeSpent > 120 ? 'moderate' : 'limited'} interest in the material.
+                  </p>
+                  <p>
+                    <strong>Engagement Quality:</strong> {sessionData?.maxScrollPercentage && sessionData.maxScrollPercentage > 80 && sessionData?.totalTimeSpent && sessionData.totalTimeSpent > 300 ? 'High-quality engagement with deep content consumption.' : sessionData?.maxScrollPercentage && sessionData.maxScrollPercentage > 50 ? 'Moderate engagement with selective content review.' : 'Quick scan with limited content absorption.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadMagnetDetailsProps) {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [activeTab, setActiveTab] = useState<'overall' | 'leads' | 'heatmap' | 'edit' | 'share'>('overall');
+  const [activeTab, setActiveTab] = useState<'overall' | 'sessions' | 'heatmap' | 'edit' | 'share'>('overall');
+  const [dateFilter, setDateFilter] = useState<'all' | '7' | '30' | '90'>('all');
+  const [trendsFilter, setTrendsFilter] = useState<'all' | '7' | '30' | '90'>('all');
+  const [showContentPopup, setShowContentPopup] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
 
   const magnet = useQuery(api.leadMagnets.get, { id: magnetId });
   const leads = useQuery(api.leads.list, { leadMagnetId: magnetId });
   const exportLeads = useQuery(api.leads.exportLeads, { leadMagnetId: magnetId });
+  const sessions = useQuery(api.analytics.getSessionsForLeadMagnet, { leadMagnetId: magnetId });
   
   const updateMagnet = useMutation(api.leadMagnets.update);
   const deleteMagnet = useMutation(api.leadMagnets.remove);
   const deleteLead = useMutation(api.leads.remove);
   const regenerateShareId = useMutation(api.leadMagnets.regenerateShareId);
 
-  // Placeholder: Replace with real queries when backend is ready
-  // const analytics = useQuery(api.analytics.getDocumentAnalytics, { documentId: magnetId });
-  // const scrollStats = useQuery(api.analytics.getDocumentHeatmapData, { documentId: magnetId });
-  const analytics = {
-    submissions: 1294,
-    averageViewCompletion: 0.871, // 87.1%
-    averageViewTime: 176, // seconds
-    trends: [
-      { date: "2024-06-05", value: 2 },
-      { date: "2024-06-26", value: 2 },
-      { date: "2024-07-15", value: 2 },
-      { date: "2024-07-20", value: 2 },
-      { date: "2024-07-24", value: 1 },
-    ],
+  // Generate real analytics data from leads and form views
+  const generateAnalytics = () => {
+    if (!leads || !magnet) return {
+      views: 0,
+      leads: 0,
+      conversionRate: 0,
+      trends: []
+    };
+
+    // Generate trends data by aggregating leads by date
+    const leadsByDate = new Map<string, number>();
+    
+    leads.forEach(lead => {
+      const date = new Date(lead._creationTime).toISOString().split('T')[0]; // YYYY-MM-DD format
+      leadsByDate.set(date, (leadsByDate.get(date) || 0) + 1);
+    });
+
+    // Convert to trends array and sort by date
+    const trends = Array.from(leadsByDate.entries())
+      .map(([date, value]) => ({ date, value }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate core metrics using real data
+    const totalLeads = leads.length;
+    const realViews = magnet.formViews || 0;
+    const conversionRate = realViews > 0 ? Math.round((totalLeads / realViews) * 100) : 0;
+
+    return {
+      views: realViews,
+      leads: totalLeads,
+      conversionRate,
+      trends
+    };
   };
+
+  const analytics = generateAnalytics();
 
   if (magnet === undefined || leads === undefined) {
     return (
@@ -93,6 +269,38 @@ export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) 
   }
 
   const shareUrl = magnet.shareId ? `${window.location.origin}/share/${magnet.shareId}` : null;
+
+  // Filter leads based on date filter
+  const filteredLeads = leads?.filter(lead => {
+    if (dateFilter === 'all') return true;
+    
+    const leadDate = new Date(lead._creationTime);
+    const now = new Date();
+    const daysDiff = Math.floor((now.getTime() - leadDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    switch (dateFilter) {
+      case '7': return daysDiff <= 7;
+      case '30': return daysDiff <= 30;
+      case '90': return daysDiff <= 90;
+      default: return true;
+    }
+  }) || [];
+
+  // Filter trends data based on trends filter
+  const filteredTrends = analytics.trends.filter(trend => {
+    if (trendsFilter === 'all') return true;
+    
+    const trendDate = new Date(trend.date);
+    const now = new Date();
+    const daysDiff = Math.floor((now.getTime() - trendDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    switch (trendsFilter) {
+      case '7': return daysDiff <= 7;
+      case '30': return daysDiff <= 30;
+      case '90': return daysDiff <= 90;
+      default: return true;
+    }
+  });
 
   const handleEdit = () => {
     setEditTitle(magnet.title);
@@ -261,7 +469,7 @@ export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) 
 
       {/* Tab navigation removed. Only rendering Overall tab content. */}
       {/* Tab Content */}
-      <div>
+            <div>
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8">
             <button
@@ -275,45 +483,45 @@ export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) 
               Overall
             </button>
             <button
-              onClick={() => setActiveTab('leads')}
+              onClick={() => setActiveTab('sessions')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'leads'
+                activeTab === 'sessions'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Leads
+              Sessions
             </button>
-            <button
+                <button
               onClick={() => setActiveTab('heatmap')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'heatmap'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-            >
+                >
               Heatmap Analytics
-            </button>
-            <button
+                </button>
+                <button
               onClick={() => setActiveTab('edit')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'edit'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-            >
+                >
               Edit Content
-            </button>
-            <button
+                </button>
+                <button
               onClick={() => setActiveTab('share')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'share'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-            >
+                >
               Share
-            </button>
+                </button>
           </nav>
         </div>
         {activeTab === 'overall' && (
@@ -344,128 +552,185 @@ export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) 
                   {magnet.isActive ? 'Deactivate' : 'Activate'}
                 </button>
                 <button
+                  onClick={() => setShowContentPopup(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  View Content
+                </button>
+                <button
                   onClick={handleDelete}
                   className="px-4 py-2 bg-red-600 text-white rounded text-sm font-semibold hover:bg-red-700"
                 >
                   Delete
                 </button>
-              </div>
-            </div>
+          </div>
+        </div>
             {/* --- Analytics Dashboard --- */}
             <div className="mb-8">
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Big picture</h2>
-              </div>
+          </div>
               {/* Big picture stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white rounded-lg shadow-sm border p-6 flex flex-col items-center">
-                  <div className="text-xs text-gray-500 mb-1">Submissions</div>
-                  <div className="text-3xl font-bold text-gray-900">{analytics.submissions}</div>
+                  <div className="text-xs text-gray-500 mb-1">Views</div>
+                  <div className="text-3xl font-bold text-gray-900">{analytics.views}</div>
                 </div>
                 <div className="bg-white rounded-lg shadow-sm border p-6 flex flex-col items-center">
-                  <div className="text-xs text-gray-500 mb-1">Avg. View Completion Rate</div>
-                  <div className="text-3xl font-bold text-gray-900">{Math.round(analytics.averageViewCompletion * 100)}%</div>
+                  <div className="text-xs text-gray-500 mb-1">Leads</div>
+                  <div className="text-3xl font-bold text-gray-900">{analytics.leads}</div>
                 </div>
                 <div className="bg-white rounded-lg shadow-sm border p-6 flex flex-col items-center">
-                  <div className="text-xs text-gray-500 mb-1">Avg. View Time</div>
-                  <div className="text-3xl font-bold text-gray-900">{formatDuration(analytics.averageViewTime)}</div>
+                  <div className="text-xs text-gray-500 mb-1">Conversion Rate</div>
+                  <div className="text-3xl font-bold text-gray-900">{analytics.conversionRate}%</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center opacity-60">
+                  <div className="text-xs text-gray-400 mb-1">Avg. View Time</div>
+                  <div className="text-3xl font-bold text-gray-400">--</div>
+                  <div className="text-xs text-gray-400 mt-1">Coming Soon</div>
                 </div>
               </div>
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Trends</h2>
-                <span className="text-sm text-gray-500">Submissions</span>
-              </div>
-              {/* Trends chart (submissions over time) */}
-              <TrendsChart trends={analytics.trends} />
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">Leads</span>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="trendsFilter" className="text-sm font-medium text-gray-700">
+                      Filter:
+                    </label>
+                    <select
+                      id="trendsFilter"
+                      value={trendsFilter}
+                      onChange={(e) => setTrendsFilter(e.target.value as 'all' | '7' | '30' | '90')}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="7">Last 7 Days</option>
+                      <option value="30">Last 30 Days</option>
+                      <option value="90">Last 90 Days</option>
+                    </select>
+                  </div>
+                </div>
+          </div>
+              {/* Trends chart (leads over time) */}
+              <TrendsChart trends={filteredTrends} />
             </div>
           </div>
         )}
 
-        {activeTab === 'leads' && (
+        {activeTab === 'sessions' && (
           <div>
-            {/* --- Leads Tab Content (existing leads table) --- */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">Leads ({leads.length})</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowLeadForm(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Add Lead
-                  </button>
-                  {leads.length > 0 && (
-                    <button
-                      onClick={downloadCSV}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                    >
-                      Export CSV
-                    </button>
-                  )}
-                </div>
+            {/* --- Sessions Tab Content --- */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">Sessions ({sessions?.length || 0})</h2>
+                      <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label htmlFor="dateFilter" className="text-sm font-medium text-gray-700">
+                  Filter:
+                </label>
+                <select
+                  id="dateFilter"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value as 'all' | '7' | '30' | '90')}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Time</option>
+                  <option value="7">Last 7 Days</option>
+                  <option value="30">Last 30 Days</option>
+                  <option value="90">Last 90 Days</option>
+                </select>
               </div>
-
-              {leads.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-gray-400 text-4xl mb-4">📧</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No leads yet</h3>
-                  <p className="text-gray-600 mb-4">Start collecting leads for this magnet</p>
-                  <button
-                    onClick={() => setShowLeadForm(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Add First Lead
-                  </button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Email</th>
-                        {magnet.fields?.firstName && (
-                          <th className="text-left py-3 px-4 font-medium text-gray-700">First Name</th>
-                        )}
-                        {magnet.fields?.lastName && (
-                          <th className="text-left py-3 px-4 font-medium text-gray-700">Last Name</th>
-                        )}
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Total Watch Time</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Last Watch Time</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Last Watched</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Sessions</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leads.map((lead) => (
-                        <tr key={lead._id} className="border-b hover:bg-gray-50">
-                          <td className="py-3 px-4">{lead.email}</td>
-                          {magnet.fields?.firstName && (
-                            <td className="py-3 px-4">{lead.firstName || "-"}</td>
-                          )}
-                          {magnet.fields?.lastName && (
-                            <td className="py-3 px-4">{lead.lastName || "-"}</td>
-                          )}
-                          <LeadWatchTimeCell magnetId={magnetId} email={lead.email} />
-                          <td className="py-3 px-4">
-                            {new Date(lead._creationTime).toLocaleDateString()}
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => handleDeleteLead(lead._id)}
-                              className="text-red-600 hover:text-red-700 text-sm"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
+        </div>
+
+        {!sessions || sessions.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-4xl mb-4">📊</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {!sessions ? "Loading sessions..." : "No sessions yet"}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {!sessions ? "Please wait while we load your session data" : "Start tracking sessions for this magnet"}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">User</th>
+                  {magnet.fields?.firstName && (
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">First Name</th>
+                  )}
+                  {magnet.fields?.lastName && (
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Last Name</th>
+                  )}
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">First Engagement</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Last Engagement</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Total Time Spent</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((session) => (
+                  <tr key={session._id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">{session.lead?.email || session.email || "-"}</td>
+                    {magnet.fields?.firstName && (
+                      <td className="py-3 px-4">{session.lead?.firstName || "-"}</td>
+                    )}
+                    {magnet.fields?.lastName && (
+                      <td className="py-3 px-4">{session.lead?.lastName || "-"}</td>
+                    )}
+                    <td className="py-3 px-4">
+                      {session.startTime 
+                        ? new Date(session.startTime).toLocaleDateString()
+                        : "-"
+                      }
+                    </td>
+                    <td className="py-3 px-4">
+                      {session.endTime 
+                        ? new Date(session.endTime).toLocaleDateString()
+                        : "-"
+                      }
+                    </td>
+                    <td className="py-3 px-4">
+                      {session.duration 
+                        ? formatDuration(session.duration)
+                        : "-"
+                      }
+                    </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => {
+                          setSelectedSession({
+                            email: session.lead?.email || session.email || "",
+                            firstName: session.lead?.firstName,
+                            lastName: session.lead?.lastName,
+                            totalTimeSpent: session.duration ?? 0,
+                            maxScrollPercentage: session.maxScrollPercentage ?? 0,
+                            firstEngagement: session.startTime,
+                            lastEngagement: session.endTime,
+                          });
+                          setShowSessionModal(true);
+                          onCollapseSidebar?.();
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                      >
+                        View Insights
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
           </div>
         )}
 
@@ -514,41 +779,94 @@ export function LeadMagnetDetails({ magnetId, onBack }: LeadMagnetDetailsProps) 
           </div>
         )}
 
-        {showLeadForm && (
-          <LeadForm
-            magnetId={magnetId}
-            onClose={() => setShowLeadForm(false)}
-          />
-        )}
+      {showLeadForm && (
+        <LeadForm
+          magnetId={magnetId}
+          onClose={() => setShowLeadForm(false)}
+        />
+      )}
+
+      {/* Content Preview Popup */}
+      {showContentPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">Lead Magnet Content Preview</h2>
+              <button
+                onClick={() => setShowContentPopup(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {magnet?.type === 'pdf' && magnet.fileUrl ? (
+                <div className="w-full">
+                  <PDFViewer 
+                    fileUrl={magnet.fileUrl} 
+                    title={magnet.title}
+                    documentId={magnet._id}
+                  />
+                </div>
+              ) : magnet?.type === 'notion' && magnet.notionUrl ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-400 text-4xl mb-4">📝</div>
+                  <p className="text-gray-600">Notion content preview not available</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    <a 
+                      href={magnet.notionUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 underline"
+                    >
+                      View in Notion
+                    </a>
+                  </p>
+                </div>
+              ) : magnet?.type === 'html' && magnet.content ? (
+                <div 
+                  className="prose max-w-none"
+                  dangerouslySetInnerHTML={{ __html: magnet.content }}
+                />
+              ) : magnet?.type === 'scratch' && magnet.content ? (
+                <div className="prose max-w-none">
+                  <TipTapContentViewer content={magnet.content} />
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-gray-400 text-4xl mb-4">📄</div>
+                  <p className="text-gray-600">No content available</p>
+                  <p className="text-sm text-gray-500 mt-2">This lead magnet doesn't have any content</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       </div>
+      <SessionDetailsModal
+        isOpen={showSessionModal}
+        onClose={() => setShowSessionModal(false)}
+        sessionData={selectedSession}
+      />
     </div>
   );
 }
 
 function TrendsChart({ trends }: { trends: { date: string; value: number }[] }) {
-  const [hovered, setHovered] = useState<number | null>(null);
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
-      <div className="relative h-48 flex items-end gap-2">
-        {trends.map((point, idx) => (
-          <div key={point.date} className="flex flex-col items-center justify-end" style={{ height: "100%" }}>
-            <div
-              className="bg-blue-500 rounded-t w-6 cursor-pointer relative"
-              style={{ height: `${point.value * 20}px` }}
-              title={`${point.value} on ${point.date}`}
-              onMouseEnter={() => setHovered(idx)}
-              onMouseLeave={() => setHovered(null)}
-            >
-              {hovered === idx && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow z-10 whitespace-nowrap">
-                  {point.value} submissions<br />{point.date}
-                </div>
-              )}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">{point.date.slice(5)}</div>
-          </div>
-        ))}
-      </div>
+    <div className="bg-white rounded-lg shadow-sm border p-6" style={{ width: '100%', height: 300 }}>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={trends} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} label={{ value: 'Leads', angle: -90, position: 'insideLeft', fontSize: 12 }} />
+          <Tooltip formatter={(value: any, name: any, props: any) => [`${value} leads`, '']} labelFormatter={label => `Date: ${label}`} />
+          <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }

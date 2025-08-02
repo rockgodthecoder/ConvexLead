@@ -1,6 +1,16 @@
-import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+
+export const getByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("leads")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .first();
+  },
+});
 
 export const list = query({
   args: { leadMagnetId: v.id("leadMagnets") },
@@ -10,21 +20,35 @@ export const list = query({
       throw new Error("Not authenticated");
     }
 
-    // Verify the user owns the lead magnet
-    const magnet = await ctx.db.get(args.leadMagnetId);
-    if (!magnet || magnet.createdBy !== userId) {
-      throw new Error("Lead magnet not found or unauthorized");
-    }
-
-    return await ctx.db
-      .query("leads")
+    // Get engagements for this lead magnet
+    const engagements = await ctx.db
+      .query("leadMagnetEngagements")
       .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", args.leadMagnetId))
-      .order("desc")
       .collect();
+
+    // Get lead details for each engagement
+    const leadsWithEngagements = await Promise.all(
+      engagements.map(async (engagement) => {
+        const lead = await ctx.db.get(engagement.leadId);
+        if (!lead) return null;
+        return {
+          ...lead,
+          engagement: {
+            firstEngagement: engagement.firstEngagement,
+            lastEngagement: engagement.lastEngagement,
+            totalTimeSpent: engagement.totalTimeSpent,
+            maxScrollPercentage: engagement.maxScrollPercentage,
+          },
+        };
+      })
+    );
+
+    return leadsWithEngagements
+      .filter((lead): lead is NonNullable<typeof lead> => lead !== null)
+      .sort((a, b) => (b.engagement.lastEngagement || 0) - (a.engagement.lastEngagement || 0));
   },
 });
 
-// New query to list all leads for the authenticated user
 export const listAll = query({
   args: {},
   handler: async (ctx) => {
@@ -33,128 +57,258 @@ export const listAll = query({
       throw new Error("Not authenticated");
     }
 
-    // Get all lead magnets owned by the user
+    // Get all lead magnets for this user
     const leadMagnets = await ctx.db
       .query("leadMagnets")
       .withIndex("by_user", (q) => q.eq("createdBy", userId))
       .collect();
 
     const leadMagnetIds = leadMagnets.map(m => m._id);
-    
     if (leadMagnetIds.length === 0) {
       return [];
     }
 
-    // Get all leads for these lead magnets
-    const allLeads = [];
+    // Get all engagements for user's lead magnets
+    const allEngagements: any[] = [];
     for (const magnetId of leadMagnetIds) {
-      const leads = await ctx.db
-        .query("leads")
+      const engagements = await ctx.db
+        .query("leadMagnetEngagements")
         .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", magnetId))
         .collect();
-      
-      // Add lead magnet info to each lead
-      const magnet = leadMagnets.find(m => m._id === magnetId);
-      const leadsWithMagnetInfo = leads.map(lead => ({
-        ...lead,
-        leadMagnetTitle: magnet?.title || "Unknown",
-        leadMagnetType: magnet?.type || "unknown",
-      }));
-      
-      allLeads.push(...leadsWithMagnetInfo);
+      allEngagements.push(...engagements);
     }
 
-    // Sort by creation time (newest first)
-    return allLeads.sort((a, b) => b._creationTime - a._creationTime);
+    // Get unique leads
+    const uniqueLeadIds = [...new Set(allEngagements.map(e => e.leadId))];
+    const leadsWithEngagements = await Promise.all(
+      uniqueLeadIds.map(async (leadId) => {
+        const lead = await ctx.db.get(leadId);
+        if (!lead) return null;
+        const leadEngagements = allEngagements.filter(e => e.leadId === leadId);
+        const engagementsWithMagnetInfo = leadEngagements.map(engagement => {
+          const magnet = leadMagnets.find(m => m._id === engagement.leadMagnetId);
+          return {
+            ...engagement,
+            leadMagnetTitle: magnet?.title || "Unknown",
+            leadMagnetType: magnet?.type || "unknown",
+          };
+        });
+        return {
+          ...lead,
+          engagements: engagementsWithMagnetInfo,
+        };
+      })
+    );
+
+    return leadsWithEngagements
+      .filter((lead): lead is NonNullable<typeof lead> => lead !== null)
+      .sort((a, b) => {
+        const aLead = a as any;
+        const bLead = b as any;
+        return (bLead.lastEngagement || 0) - (aLead.lastEngagement || 0);
+      });
   },
 });
 
 export const create = mutation({
   args: {
-    leadMagnetId: v.id("leadMagnets"),
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     phone: v.optional(v.string()),
     company: v.optional(v.string()),
-    notes: v.optional(v.string()),
+    leadMagnetId: v.id("leadMagnets"),
   },
   handler: async (ctx, args) => {
-    // Check if lead already exists for this magnet
+    const { leadMagnetId, ...leadData } = args;
+    
+    // Check if lead already exists
     const existingLead = await ctx.db
       .query("leads")
-      .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", args.leadMagnetId))
-      .filter((q) => q.eq(q.field("email"), args.email))
+      .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
 
+    let leadId: any;
+    
     if (existingLead) {
-      throw new Error("Email already registered for this lead magnet");
+      // Update existing lead
+      await ctx.db.patch(existingLead._id, {
+        ...leadData,
+      });
+      leadId = existingLead._id;
+    } else {
+      // Create new lead
+      leadId = await ctx.db.insert("leads", {
+        ...leadData,
+        createdAt: Date.now(),
+      });
     }
 
-    return await ctx.db.insert("leads", args);
+    // Create engagement record
+    await ctx.db.insert("leadMagnetEngagements", {
+      leadId,
+      leadMagnetId,
+      firstEngagement: Date.now(),
+      lastEngagement: Date.now(),
+      totalTimeSpent: 0,
+      maxScrollPercentage: 0,
+    });
+
+    return leadId;
   },
 });
 
-// Public mutation to create lead via share link
 export const createFromShare = mutation({
   args: {
-    shareId: v.string(),
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     phone: v.optional(v.string()),
     company: v.optional(v.string()),
+    shareId: v.string(),
   },
   handler: async (ctx, args) => {
-    // Find the lead magnet by share ID
+    const { shareId, ...leadData } = args;
+    
+    // Find lead magnet by share ID
     const magnet = await ctx.db
       .query("leadMagnets")
-      .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
+      .withIndex("by_share_id", (q) => q.eq("shareId", shareId))
       .first();
 
-    if (!magnet || !magnet.isActive) {
-      throw new Error("Lead magnet not found or inactive");
+    if (!magnet) {
+      throw new Error("Lead magnet not found");
     }
 
-    // Check if lead already exists for this magnet
+    // Check if lead already exists
     const existingLead = await ctx.db
       .query("leads")
-      .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", magnet._id))
-      .filter((q) => q.eq(q.field("email"), args.email))
+      .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
 
+    let leadId: any;
+    
     if (existingLead) {
-      throw new Error("Email already registered for this lead magnet");
+      // Update existing lead
+      await ctx.db.patch(existingLead._id, {
+        ...leadData,
+      });
+      leadId = existingLead._id;
+    } else {
+      // Create new lead
+      leadId = await ctx.db.insert("leads", {
+        ...leadData,
+        createdAt: Date.now(),
+      });
     }
 
-    const { shareId, ...leadData } = args;
-    return await ctx.db.insert("leads", {
-      ...leadData,
-      leadMagnetId: magnet._id,
-    });
+    // Check if engagement already exists
+    const existingEngagement = await ctx.db
+      .query("leadMagnetEngagements")
+      .withIndex("by_lead_and_magnet", (q) => 
+        q.eq("leadId", leadId).eq("leadMagnetId", magnet._id)
+      )
+      .first();
+
+    if (existingEngagement) {
+      // Update existing engagement
+      await ctx.db.patch(existingEngagement._id, {
+        lastEngagement: Date.now(),
+      });
+    } else {
+      // Create new engagement
+      await ctx.db.insert("leadMagnetEngagements", {
+        leadId,
+        leadMagnetId: magnet._id,
+        firstEngagement: Date.now(),
+        lastEngagement: Date.now(),
+        totalTimeSpent: 0,
+        maxScrollPercentage: 0,
+      });
+    }
+
+    return { leadId, magnetId: magnet._id };
   },
 });
 
 export const remove = mutation({
-  args: { id: v.id("leads") },
+  args: { leadId: v.id("leads") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
 
-    const lead = await ctx.db.get(args.id);
-    if (!lead) {
-      throw new Error("Lead not found");
+    // Delete all engagements for this lead
+    const engagements = await ctx.db
+      .query("leadMagnetEngagements")
+      .withIndex("by_lead", (q) => q.eq("leadId", args.leadId))
+      .collect();
+
+    for (const engagement of engagements) {
+      await ctx.db.delete(engagement._id);
     }
 
-    // Verify the user owns the lead magnet
-    const magnet = await ctx.db.get(lead.leadMagnetId);
-    if (!magnet || magnet.createdBy !== userId) {
-      throw new Error("Unauthorized");
+    // Delete the lead
+    await ctx.db.delete(args.leadId);
+  },
+});
+
+export const getAllLeadsWithEngagements = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
     }
 
-    await ctx.db.delete(args.id);
+    const leadMagnets = await ctx.db
+      .query("leadMagnets")
+      .withIndex("by_user", (q) => q.eq("createdBy", userId))
+      .collect();
+
+    const leadMagnetIds = leadMagnets.map(m => m._id);
+    if (leadMagnetIds.length === 0) {
+      return [];
+    }
+
+    const allEngagements: any[] = [];
+    for (const magnetId of leadMagnetIds) {
+      const engagements = await ctx.db
+        .query("leadMagnetEngagements")
+        .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", magnetId))
+        .collect();
+      allEngagements.push(...engagements);
+    }
+
+    const uniqueLeadIds = [...new Set(allEngagements.map(e => e.leadId))];
+    const leadsWithEngagements = await Promise.all(
+      uniqueLeadIds.map(async (leadId) => {
+        const lead = await ctx.db.get(leadId);
+        if (!lead) return null;
+        const leadEngagements = allEngagements.filter(e => e.leadId === leadId);
+        const engagementsWithMagnetInfo = leadEngagements.map(engagement => {
+          const magnet = leadMagnets.find(m => m._id === engagement.leadMagnetId);
+          return {
+            ...engagement,
+            leadMagnetTitle: magnet?.title || "Unknown",
+            leadMagnetType: magnet?.type || "unknown",
+          };
+        });
+        return {
+          ...lead,
+          engagements: engagementsWithMagnetInfo,
+        };
+      })
+    );
+
+    return leadsWithEngagements
+      .filter((lead): lead is NonNullable<typeof lead> => lead !== null)
+      .sort((a, b) => {
+        const aLead = a as any;
+        const bLead = b as any;
+        return (bLead.lastEngagement || 0) - (aLead.lastEngagement || 0);
+      });
   },
 });
 
@@ -166,25 +320,34 @@ export const exportLeads = query({
       throw new Error("Not authenticated");
     }
 
-    // Verify the user owns the lead magnet
     const magnet = await ctx.db.get(args.leadMagnetId);
     if (!magnet || magnet.createdBy !== userId) {
       throw new Error("Lead magnet not found or unauthorized");
     }
 
-    const leads = await ctx.db
-      .query("leads")
+    const engagements = await ctx.db
+      .query("leadMagnetEngagements")
       .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", args.leadMagnetId))
       .collect();
 
-    return leads.map((lead) => ({
-      email: lead.email,
-      firstName: lead.firstName || "",
-      lastName: lead.lastName || "",
-      phone: lead.phone || "",
-      company: lead.company || "",
-      notes: lead.notes || "",
-      createdAt: new Date(lead._creationTime).toISOString(),
-    }));
+    const leadsWithEngagements = await Promise.all(
+      engagements.map(async (engagement) => {
+        const lead = await ctx.db.get(engagement.leadId);
+        if (!lead) return null;
+        return {
+          ...lead,
+          engagement: {
+            firstEngagement: engagement.firstEngagement,
+            lastEngagement: engagement.lastEngagement,
+            totalTimeSpent: engagement.totalTimeSpent,
+            maxScrollPercentage: engagement.maxScrollPercentage,
+          },
+        };
+      })
+    );
+
+    return leadsWithEngagements
+      .filter((lead): lead is NonNullable<typeof lead> => lead !== null)
+      .sort((a, b) => (b.engagement.lastEngagement || 0) - (a.engagement.lastEngagement || 0));
   },
 });

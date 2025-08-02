@@ -22,38 +22,140 @@ function LeadMagnetsModal({ email, onClose }: { email: string; onClose: () => vo
   // const { data, isLoading } = useQuery(api.leads.getLeadMagnetsForLead, { email });
   const isLoading = false;
   const data = [
-    { magnetId: "1", title: "Ebook.pdf", totalWatchTime: 510, lastInteraction: Date.now() },
-    { magnetId: "2", title: "Checklist", totalWatchTime: 240, lastInteraction: Date.now() - 86400000 },
+    { 
+      magnetId: "1", 
+      title: "Ebook.pdf", 
+      totalWatchTime: 510, 
+      lastInteraction: Date.now(),
+      type: "pdf",
+      interactionType: "viewed",
+      description: "Downloaded and viewed the complete guide"
+    },
+    { 
+      magnetId: "2", 
+      title: "Checklist", 
+      totalWatchTime: 240, 
+      lastInteraction: Date.now() - 86400000,
+      type: "scratch",
+      interactionType: "completed",
+      description: "Completed the entire checklist"
+    },
+    { 
+      magnetId: "3", 
+      title: "Video Tutorial", 
+      totalWatchTime: 1800, 
+      lastInteraction: Date.now() - 172800000,
+      type: "html",
+      interactionType: "watched",
+      description: "Watched 75% of the tutorial video"
+    },
   ];
+
+  // Sort by last interaction (most recent first)
+  const sortedData = [...data].sort((a, b) => b.lastInteraction - a.lastInteraction);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "scratch": return "✏️";
+      case "pdf": return "📄";
+      case "notion": return "📝";
+      case "html": return "🌐";
+      default: return "📄";
+    }
+  };
+
+
+
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Lead Magnets for {email}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+      <div className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900">Lead Magnet Timeline</h3>
+            <p className="text-sm text-gray-600 mt-1">{email}</p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            ✕
+          </button>
         </div>
+
         {isLoading ? (
-          <div className="py-8 text-center">Loading...</div>
+          <div className="py-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading timeline...</p>
+          </div>
+        ) : sortedData.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-4xl mb-4">📭</div>
+            <h4 className="text-lg font-medium text-gray-900 mb-2">No interactions yet</h4>
+            <p className="text-gray-600">This lead hasn't interacted with any lead magnets yet.</p>
+          </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200 mt-4">
-            <thead>
-              <tr>
-                <th className="text-left py-2 px-2">Title</th>
-                <th className="text-left py-2 px-2">Total Read Time</th>
-                <th className="text-left py-2 px-2">Last Read</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((magnet) => (
-                <tr key={magnet.magnetId}>
-                  <td className="py-2 px-2">{magnet.title}</td>
-                  <td className="py-2 px-2">{formatDuration(magnet.totalWatchTime)}</td>
-                  <td className="py-2 px-2">{formatDate(magnet.lastInteraction)}</td>
-                </tr>
+          <div className="space-y-6">
+            {/* Timeline */}
+            <div className="relative">
+              {/* Timeline line */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+              
+              {sortedData.map((magnet, index) => (
+                <div key={magnet.magnetId} className="relative flex items-start gap-4 mb-6">
+                                     {/* Timeline dot */}
+                   <div className="relative z-10 flex-shrink-0 w-12 h-12 bg-white border-2 border-blue-500 rounded-full flex items-center justify-center">
+                     <span className="text-lg">⏱️</span>
+                   </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                         <div className="flex items-start justify-between mb-2">
+                       <div className="flex items-center gap-2">
+                         <h4 className="font-semibold text-gray-900">{magnet.title}</h4>
+                       </div>
+                     </div>
+                    
+                                         <p className="text-sm text-gray-600 mb-3">{magnet.description}</p>
+                     
+                     <div className="flex items-center gap-4 text-xs text-gray-500">
+                       <div className="flex items-center gap-1">
+                         <span>⏱️</span>
+                         <span className="font-medium">{formatDuration(magnet.totalWatchTime)} view time</span>
+                       </div>
+                       <div className="flex items-center gap-1">
+                         <span>📅</span>
+                         <span className="font-medium">Last read: {new Date(magnet.lastInteraction).toLocaleDateString()}</span>
+                       </div>
+                     </div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-2">Summary</h4>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-blue-600 font-medium">Total Magnets:</span>
+                  <span className="ml-1 text-blue-900">{sortedData.length}</span>
+                </div>
+                <div>
+                  <span className="text-blue-600 font-medium">Total Time:</span>
+                  <span className="ml-1 text-blue-900">
+                    {formatDuration(sortedData.reduce((sum, m) => sum + m.totalWatchTime, 0))}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-blue-600 font-medium">Last Activity:</span>
+                  <span className="ml-1 text-blue-900">
+                    {new Date(sortedData[0]?.lastInteraction || 0).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </>
@@ -67,7 +169,6 @@ export function Leads() {
   
   const leadMagnets = useQuery(api.leadMagnets.list);
   const allLeads = useQuery(api.leads.listAll);
-  const deleteLead = useMutation(api.leads.remove);
 
   if (leadMagnets === undefined || allLeads === undefined) {
     return (
@@ -77,18 +178,7 @@ export function Leads() {
     );
   }
 
-  const handleDeleteLead = async (leadId: Id<"leads">) => {
-    if (!confirm("Are you sure you want to delete this lead?")) {
-      return;
-    }
 
-    try {
-      await deleteLead({ id: leadId });
-      toast.success("Lead deleted successfully!");
-    } catch (error) {
-      toast.error("Failed to delete lead");
-    }
-  };
 
   const downloadAllLeadsCSV = () => {
     if (!allLeads || allLeads.length === 0) {
@@ -270,7 +360,6 @@ export function Leads() {
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Phone</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Lead Magnet</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Magnets</th>
                 </tr>
               </thead>
@@ -316,14 +405,6 @@ export function Leads() {
                       <span className="text-sm text-gray-600">
                         {new Date(lead._creationTime).toLocaleDateString()}
                       </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <button
-                        onClick={() => handleDeleteLead(lead._id)}
-                        className="text-red-600 hover:text-red-700 text-sm"
-                      >
-                        Delete
-                      </button>
                     </td>
                     <td className="py-3 px-4">
                       <button

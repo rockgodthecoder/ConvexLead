@@ -1,57 +1,131 @@
+import { mutation, action, query } from "./_generated/server";
 import { v } from "convex/values";
-import { action, mutation, query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 
-// 1. Save a complete analytics session (called from frontend)
 export const saveSession = mutation({
   args: {
-    documentId: v.id("leadMagnets"),
     sessionId: v.string(),
     browserId: v.string(),
+    documentId: v.id("leadMagnets"),
     userId: v.optional(v.string()),
-    userAgent: v.string(),
-    referrer: v.optional(v.string()),
+    leadId: v.optional(v.id("leads")),
     startTime: v.number(),
     endTime: v.number(),
     duration: v.number(),
     maxScrollPercentage: v.number(),
-    scrollEventCount: v.optional(v.number()),
-    scrollEventsFileId: v.optional(v.id("_storage")),
+    scrollEvents: v.array(v.object({
+      timestamp: v.number(),
+      scrollY: v.number(),
+      scrollPercentage: v.number(),
+      viewportHeight: v.number(),
+      documentHeight: v.number(),
+    })),
+    userAgent: v.string(),
+    referrer: v.optional(v.string()),
     viewport: v.object({ width: v.number(), height: v.number() }),
-    email: v.optional(v.string()), // <-- add this
+    email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Store scroll events in a separate file if there are many
+    let scrollEventsFileId: any = undefined;
+    // Note: File storage temporarily disabled due to API issues
+
     await ctx.db.insert("analyticsSessions", {
-      ...args,
+      sessionId: args.sessionId,
+      browserId: args.browserId,
+      documentId: args.documentId,
+      userId: args.userId,
+      leadId: args.leadId,
+      startTime: args.startTime,
+      endTime: args.endTime,
+      duration: args.duration,
+      maxScrollPercentage: args.maxScrollPercentage,
+      scrollEventCount: args.scrollEvents.length,
+      scrollEventsFileId,
+      userAgent: args.userAgent,
+      referrer: args.referrer,
+      viewport: args.viewport,
       processed: false,
       createdAt: Date.now(),
+      email: args.email,
     });
+  },
+});
+
+export const saveCompleteSession = action({
+  args: {
+    sessionId: v.string(),
+    browserId: v.string(),
+    documentId: v.id("leadMagnets"),
+    userId: v.optional(v.string()),
+    startTime: v.number(),
+    endTime: v.number(),
+    duration: v.number(),
+    maxScrollPercentage: v.number(),
+    scrollEvents: v.array(v.object({
+      timestamp: v.number(),
+      scrollY: v.number(),
+      scrollPercentage: v.number(),
+      viewportHeight: v.number(),
+      documentHeight: v.number(),
+    })),
+    userAgent: v.string(),
+    referrer: v.optional(v.string()),
+    viewport: v.object({ width: v.number(), height: v.number() }),
+    email: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Find lead by email if provided
+    let leadId: any = undefined;
+    if (args.email) {
+      const lead: any = await ctx.runQuery(api.leads.getByEmail, { email: args.email });
+      if (lead) {
+        leadId = lead._id;
+        
+        // Update engagement metrics
+        await ctx.runMutation(api.analytics.updateEngagement, {
+          leadId: lead._id,
+          leadMagnetId: args.documentId,
+          duration: args.duration,
+          maxScrollPercentage: args.maxScrollPercentage,
+        });
+      }
+    }
+
+    // Save session with leadId
+    await ctx.runMutation(api.analytics.saveSession, {
+      ...args,
+      leadId,
+    });
+
     return null;
   },
 });
 
-export const saveSessionAnalytics = action({
+export const updateEngagement = mutation({
   args: {
-    documentId: v.id("leadMagnets"),
-    sessionId: v.string(),
-    browserId: v.string(),
-    userId: v.optional(v.string()),
-    userAgent: v.string(),
-    referrer: v.optional(v.string()),
-    startTime: v.number(),
-    endTime: v.number(),
+    leadId: v.id("leads"),
+    leadMagnetId: v.id("leadMagnets"),
     duration: v.number(),
     maxScrollPercentage: v.number(),
-    scrollEventCount: v.optional(v.number()),
-    scrollEventsFileId: v.optional(v.id("_storage")),
-    viewport: v.object({ width: v.number(), height: v.number() }),
-    email: v.optional(v.string()), // <-- add this
   },
   handler: async (ctx, args) => {
-    // Store session data in analyticsSessions, mark as unprocessed
-    await ctx.runMutation(api.analytics.saveSession, { ...args });
-    return { success: true };
+    const engagement = await ctx.db
+      .query("leadMagnetEngagements")
+      .withIndex("by_lead_and_magnet", (q) =>
+        q.eq("leadId", args.leadId).eq("leadMagnetId", args.leadMagnetId)
+      )
+      .first();
+
+    if (engagement) {
+      await ctx.db.patch(engagement._id, {
+        lastEngagement: Date.now(),
+        totalTimeSpent: engagement.totalTimeSpent + args.duration,
+        maxScrollPercentage: Math.max(engagement.maxScrollPercentage, args.maxScrollPercentage),
+      });
+    }
+    return null;
   },
 });
 
@@ -67,7 +141,7 @@ export const processAndGetDocumentAnalytics = mutation({
     // Get all sessions for this document in the time range
     const sessions = await ctx.db
       .query("analyticsSessions")
-      .withIndex("by_document_and_time", q =>
+      .withIndex("by_document_and_time", (q) =>
         q.eq("documentId", args.documentId).gte("startTime", cutoffTime)
       )
       .collect();
@@ -165,7 +239,7 @@ export const getDocumentAnalytics = query({
     // Find the latest analytics for this document and time range
     const analytics = await ctx.db
       .query("documentAnalytics")
-      .withIndex("by_document_and_timerange", q =>
+      .withIndex("by_document_and_timerange", (q) =>
         q.eq("documentId", args.documentId).eq("timeRange", timeRange)
       )
       .first();
@@ -196,7 +270,7 @@ export const recordJourneySession = mutation({
     utmCampaign: v.optional(v.string()),
     utmTerm: v.optional(v.string()),
     utmContent: v.optional(v.string()),
-    email: v.optional(v.string()), // <-- add this
+    email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("journeySessions", {
@@ -216,7 +290,7 @@ export const processAndGetUserJourneyAnalytics = mutation({
     // Get all journey sessions for this browserId (and userId if provided)
     const sessions = await ctx.db
       .query("journeySessions")
-      .withIndex("by_browser", q => q.eq("browserId", args.browserId))
+      .withIndex("by_browser", (q) => q.eq("browserId", args.browserId))
       .collect();
     if (sessions.length === 0) return null;
     // Group by document
@@ -296,9 +370,67 @@ export const getUserJourneyAnalytics = query({
     // Find the latest analytics for this browserId/userId
     const analytics = await ctx.db
       .query("userJourneyAnalytics")
-      .withIndex("by_browser", q => q.eq("browserId", args.browserId))
+      .withIndex("by_browser", (q) => q.eq("browserId", args.browserId))
       .first();
     return analytics || null;
+  },
+});
+
+export const recordFormView = mutation({
+  args: {
+    leadMagnetId: v.id("leadMagnets"),
+    shareId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Generate a unique session ID for this form view
+    const sessionId = `form_view_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const browserId = `browser_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`📊 Recording form view for lead magnet: ${args.leadMagnetId}, shareId: ${args.shareId}`);
+    
+    await ctx.db.insert("analyticsSessions", {
+      sessionId,
+      browserId,
+      documentId: args.leadMagnetId,
+      startTime: Date.now(),
+      endTime: Date.now(),
+      duration: 0, // Form view duration is 0 since we're just recording the view
+      maxScrollPercentage: 0,
+      scrollEventCount: 0,
+      scrollEventsFileId: undefined,
+      userAgent: "Form View Tracking",
+      referrer: "Direct", // We'll get the actual referrer from the client
+      viewport: { width: 0, height: 0 }, // Will be updated if needed
+      processed: false,
+      createdAt: Date.now(),
+    });
+    
+    console.log(`✅ Form view recorded successfully with sessionId: ${sessionId}`);
+  },
+});
+
+export const getFormViews = query({
+  args: {
+    leadMagnetId: v.id("leadMagnets"),
+  },
+  handler: async (ctx, args) => {
+    console.log(`🔍 Getting form views for lead magnet: ${args.leadMagnetId}`);
+    
+    // Count form views (sessions with duration 0 and "Form View Tracking" user agent)
+    const formViews = await ctx.db
+      .query("analyticsSessions")
+      .withIndex("by_document", (q) => q.eq("documentId", args.leadMagnetId))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("duration"), 0),
+          q.eq(q.field("userAgent"), "Form View Tracking")
+        )
+      )
+      .collect();
+    
+    console.log(`📊 Found ${formViews.length} form views for lead magnet: ${args.leadMagnetId}`);
+    
+    return formViews.length;
   },
 });
 
@@ -322,5 +454,45 @@ export const getLeadWatchTime = query({
       lastWatchedAt: lastSession ? lastSession.endTime : null,
       sessionCount: sessions.length,
     };
+  },
+});
+
+export const getSessionsForLeadMagnet = query({
+  args: {
+    leadMagnetId: v.id("leadMagnets"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 100;
+    
+    // Get sessions for this lead magnet, ordered by most recent first
+    const sessions = await ctx.db
+      .query("analyticsSessions")
+      .withIndex("by_document_and_time", (q) => q.eq("documentId", args.leadMagnetId))
+      .order("desc")
+      .take(limit);
+    
+    // Get lead information for sessions that have leadId
+    const sessionsWithLeads = await Promise.all(
+      sessions.map(async (session) => {
+        let lead = null;
+        if (session.leadId) {
+          lead = await ctx.db.get(session.leadId);
+        }
+        
+        return {
+          ...session,
+          lead: lead ? {
+            email: lead.email,
+            firstName: lead.firstName,
+            lastName: lead.lastName,
+            phone: lead.phone,
+            company: lead.company,
+          } : null,
+        };
+      })
+    );
+    
+    return sessionsWithLeads;
   },
 }); 

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
-import { PDFViewer } from "./PDFViewer";
-import { TipTapContentViewer } from "./TipTapContentViewer";
+import { UnifiedContentViewer } from "./UnifiedContentViewer";
+import { useAnalyticsTracking } from "../hooks/use-analytics-tracking";
+import { AnalyticsDemo } from "./AnalyticsDemo";
 
 interface PublicLeadFormProps {
   shareId: string;
@@ -17,9 +18,20 @@ export function PublicLeadForm({ shareId }: PublicLeadFormProps) {
   const [company, setCompany] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
 
   const magnet = useQuery(api.leadMagnets.getByShareId, { shareId });
   const createLead = useMutation(api.leads.createFromShare);
+  const incrementFormViews = useMutation(api.leadMagnets.incrementFormViews);
+
+  // Record form view when component mounts (someone lands on the form)
+  useEffect(() => {
+    if (magnet?._id && !isSubmitted) {
+      incrementFormViews({ 
+        leadMagnetId: magnet._id
+      });
+    }
+  }, [magnet?._id, isSubmitted, incrementFormViews]);
 
   // Debug logging
   console.log("ShareId:", shareId);
@@ -61,6 +73,7 @@ export function PublicLeadForm({ shareId }: PublicLeadFormProps) {
       });
 
       setIsSubmitted(true);
+      setUserEmail(email.trim());
       toast.success("Thank you! Your information has been submitted.");
     } catch (error: any) {
       console.error("Error submitting lead:", error);
@@ -85,59 +98,31 @@ export function PublicLeadForm({ shareId }: PublicLeadFormProps) {
 
   if (isSubmitted) {
     return (
-      <div className="max-w-2xl mx-auto p-8">
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-          {/* Content Section - now appears first and more prominent */}
-          {magnet?.type === "pdf" && magnet?.fileUrl && (
-            <div className="mb-8">
-              <PDFViewer 
-                fileUrl={magnet.fileUrl} 
-                title={magnet.title}
-                className="w-full"
-              />
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto p-8">
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            {/* Thank You Message */}
+            <div className="mb-8 text-center">
+              <div className="text-3xl mb-2">✅</div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Thank You!</h2>
+              <p className="text-gray-500 mb-2 text-sm">
+                Your information has been submitted successfully.
+              </p>
+              <p className="text-gray-400 text-xs">
+                You can now access your lead magnet below.
+              </p>
             </div>
-          )}
 
-          {magnet?.type === "notion" && magnet?.notionUrl && (
-            <a
-              href={magnet.notionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors mb-8"
-            >
-              📝 View Notion Page
-            </a>
-          )}
-
-          {magnet?.type === "scratch" && magnet?.content && (
-            <div className="mb-8 p-6 bg-gray-50 rounded-lg text-left border border-blue-200 shadow-sm">
-              <h3 className="font-semibold mb-3 text-lg text-blue-700">Your Lead Magnet Content:</h3>
-              <div className="text-gray-800 text-base leading-relaxed flex justify-center">
-                <TipTapContentViewer content={magnet.content} />
-              </div>
-            </div>
-          )}
-
-          {magnet?.type === "html" && magnet?.content && (
-            <div className="mb-8 p-6 bg-gray-50 rounded-lg text-left border border-blue-200 shadow-sm">
-              <h3 className="font-semibold mb-3 text-lg text-blue-700">Your Lead Magnet Content:</h3>
-              <div 
-                className="text-gray-800 text-base leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: magnet.content }}
-              />
-            </div>
-          )}
-
-          {/* Thank You Message - now below and less prominent */}
-          <div className="mt-2 text-center">
-            <div className="text-3xl mb-2">✅</div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Thank You!</h2>
-            <p className="text-gray-500 mb-2 text-sm">
-              Your information has been submitted successfully.
-            </p>
-            <p className="text-gray-400 text-xs">
-              You can now access your lead magnet above.
-            </p>
+            {/* Content Section */}
+            <UnifiedContentViewer
+              type={magnet.type}
+              content={magnet.content}
+              fileUrl={magnet.fileUrl}
+              notionUrl={magnet.notionUrl}
+              title={magnet.title}
+              documentId={magnet._id}
+              userEmail={userEmail}
+            />
           </div>
         </div>
       </div>
