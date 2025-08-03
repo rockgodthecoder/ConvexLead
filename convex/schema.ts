@@ -24,6 +24,13 @@ const applicationTables = {
     shareId: v.optional(v.string()),
     // Analytics fields
     formViews: v.optional(v.number()), // Number of times the form was viewed
+    // CTA (Call-to-Action) fields
+    cta: v.optional(v.object({
+      mainText: v.string(),
+      description: v.optional(v.string()),
+      buttonText: v.string(),
+      link: v.string(),
+    })),
   })
     .index("by_user", ["createdBy"])
     .index("by_user_and_active", ["createdBy", "isActive"])
@@ -71,6 +78,14 @@ const applicationTables = {
     processed: v.optional(v.boolean()),
     createdAt: v.number(),
     email: v.optional(v.string()),
+    // CTA Click Tracking
+    ctaClicks: v.optional(v.number()), // Number of CTA clicks in this session
+    // Method 2 Pixel Bin Tracking
+    pixelBins: v.optional(v.array(v.object({
+      y: v.number(),
+      timeSpent: v.number(),
+      isActive: v.optional(v.boolean())
+    }))),
   })
     .index("by_document", ["documentId"])
     .index("by_browser", ["browserId"])
@@ -86,6 +101,10 @@ const applicationTables = {
     totalScrollEvents: v.number(),
     completedSessions: v.number(),
     bouncedSessions: v.number(),
+    // CTA Analytics
+    totalCtaClicks: v.number(),
+    ctaClickRate: v.number(), // Percentage of sessions with CTA clicks
+    // Scroll depth buckets
     scrollDepthBuckets: v.object({
       depth_0_25: v.number(),
       depth_25_50: v.number(),
@@ -104,6 +123,7 @@ const applicationTables = {
       uniqueVisitors: v.number(),
       averageTimeSpent: v.number(),
       averageScrollDepth: v.number(),
+      ctaClicks: v.number(), // CTA clicks per day
     })),
     lastProcessedSession: v.optional(v.string()),
     lastUpdated: v.number(),

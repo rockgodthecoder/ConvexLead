@@ -50,6 +50,7 @@ interface SessionDetailsModalProps {
     lastName?: string;
     totalTimeSpent: number;
     maxScrollPercentage: number;
+    ctaClicks: number;
     firstEngagement?: number;
     lastEngagement?: number;
   };
@@ -139,6 +140,18 @@ function SessionDetailsModal({ isOpen, onClose, sessionData }: SessionDetailsMod
                 </div>
                 <div className="text-sm text-blue-700">
                   Active reading time
+                </div>
+              </div>
+            </div>
+            {/* CTA Clicks */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">CTA Engagement</h3>
+              <div className="bg-pink-50 rounded-lg p-4">
+                <div className="text-3xl font-bold text-pink-600 mb-1">
+                  {sessionData?.ctaClicks || 0}
+                </div>
+                <div className="text-sm text-pink-700">
+                  Call-to-action clicks
                 </div>
               </div>
             </div>
@@ -660,51 +673,55 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">User</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">User</th>
                   {magnet.fields?.firstName && (
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">First Name</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-700">First Name</th>
                   )}
                   {magnet.fields?.lastName && (
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Last Name</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-700">Last Name</th>
                   )}
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">First Engagement</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Last Engagement</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Total Time Spent</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">First Engagement</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">Last Engagement</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">Total Time Spent</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">CTA Clicks</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sessions.map((session) => (
                   <tr key={session._id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">{session.lead?.email || session.email || "-"}</td>
+                    <td className="py-2 px-3">{session.lead?.email || session.email || "-"}</td>
                     {magnet.fields?.firstName && (
-                      <td className="py-3 px-4">{session.lead?.firstName || "-"}</td>
+                      <td className="py-2 px-3">{session.lead?.firstName || "-"}</td>
                     )}
                     {magnet.fields?.lastName && (
-                      <td className="py-3 px-4">{session.lead?.lastName || "-"}</td>
+                      <td className="py-2 px-3">{session.lead?.lastName || "-"}</td>
                     )}
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       {session.startTime 
                         ? new Date(session.startTime).toLocaleDateString()
                         : "-"
                       }
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       {session.endTime 
                         ? new Date(session.endTime).toLocaleDateString()
                         : "-"
                       }
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       {session.duration 
                         ? formatDuration(session.duration)
                         : "-"
                       }
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
+                      {session.ctaClicks || 0}
+                    </td>
+                    <td className="py-2 px-3">
                       <button
                         onClick={() => {
                           setSelectedSession({
@@ -713,13 +730,14 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
                             lastName: session.lead?.lastName,
                             totalTimeSpent: session.duration ?? 0,
                             maxScrollPercentage: session.maxScrollPercentage ?? 0,
+                            ctaClicks: session.ctaClicks ?? 0,
                             firstEngagement: session.startTime,
                             lastEngagement: session.endTime,
                           });
                           setShowSessionModal(true);
                           onCollapseSidebar?.();
                         }}
-                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                       >
                         View Insights
                       </button>

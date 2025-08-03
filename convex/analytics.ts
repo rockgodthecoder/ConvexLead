@@ -24,6 +24,14 @@ export const saveSession = mutation({
     referrer: v.optional(v.string()),
     viewport: v.object({ width: v.number(), height: v.number() }),
     email: v.optional(v.string()),
+    // CTA Click Tracking
+    ctaClicks: v.optional(v.number()),
+    // Method 2 Pixel Bin Tracking
+    pixelBins: v.optional(v.array(v.object({
+      y: v.number(),
+      timeSpent: v.number(),
+      isActive: v.optional(v.boolean())
+    }))),
   },
   handler: async (ctx, args) => {
     // Store scroll events in a separate file if there are many
@@ -48,6 +56,8 @@ export const saveSession = mutation({
       processed: false,
       createdAt: Date.now(),
       email: args.email,
+      ctaClicks: args.ctaClicks || 0,
+      pixelBins: args.pixelBins,
     });
   },
 });
@@ -73,6 +83,14 @@ export const saveCompleteSession = action({
     referrer: v.optional(v.string()),
     viewport: v.object({ width: v.number(), height: v.number() }),
     email: v.optional(v.string()),
+    // CTA Click Tracking
+    ctaClicks: v.optional(v.number()),
+    // Method 2 Pixel Bin Tracking
+    pixelBins: v.optional(v.array(v.object({
+      y: v.number(),
+      timeSpent: v.number(),
+      isActive: v.optional(v.boolean())
+    }))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -152,6 +170,11 @@ export const processAndGetDocumentAnalytics = mutation({
     const totalScrollEvents = sessions.reduce((sum, s) => sum + (s.scrollEventCount || 0), 0);
     const completedSessions = sessions.filter(s => (s.maxScrollPercentage || 0) >= 90).length;
     const bouncedSessions = sessions.filter(s => (s.duration || 0) < 10).length;
+    
+    // CTA Analytics
+    const totalCtaClicks = sessions.reduce((sum, s) => sum + (s.ctaClicks || 0), 0);
+    const sessionsWithCtaClicks = sessions.filter(s => (s.ctaClicks || 0) > 0).length;
+    const ctaClickRate = totalSessions > 0 ? (sessionsWithCtaClicks / totalSessions) * 100 : 0;
     // Scroll depth buckets
     const scrollDepthBuckets = {
       depth_0_25: sessions.filter(s => s.maxScrollPercentage < 25).length,
@@ -180,14 +203,15 @@ export const processAndGetDocumentAnalytics = mutation({
     });
     const referrerDomains = Object.entries(referrerDomainsMap).map(([domain, count]) => ({ domain, count }));
     // Daily stats
-    const dailyStatsMap: Record<string, { sessions: number; uniqueVisitors: Set<string>; totalTime: number; totalScroll: number; }> = {};
+    const dailyStatsMap: Record<string, { sessions: number; uniqueVisitors: Set<string>; totalTime: number; totalScroll: number; totalCtaClicks: number; }> = {};
     sessions.forEach(s => {
       const date = new Date(s.startTime).toISOString().slice(0, 10);
-      if (!dailyStatsMap[date]) dailyStatsMap[date] = { sessions: 0, uniqueVisitors: new Set(), totalTime: 0, totalScroll: 0 };
+      if (!dailyStatsMap[date]) dailyStatsMap[date] = { sessions: 0, uniqueVisitors: new Set(), totalTime: 0, totalScroll: 0, totalCtaClicks: 0 };
       dailyStatsMap[date].sessions++;
       dailyStatsMap[date].uniqueVisitors.add(s.browserId);
       dailyStatsMap[date].totalTime += s.duration || 0;
       dailyStatsMap[date].totalScroll += s.maxScrollPercentage || 0;
+      dailyStatsMap[date].totalCtaClicks += s.ctaClicks || 0;
     });
     const dailyStats = Object.entries(dailyStatsMap).map(([date, stats]) => ({
       date,
@@ -195,6 +219,7 @@ export const processAndGetDocumentAnalytics = mutation({
       uniqueVisitors: stats.uniqueVisitors.size,
       averageTimeSpent: stats.sessions > 0 ? stats.totalTime / stats.sessions : 0,
       averageScrollDepth: stats.sessions > 0 ? stats.totalScroll / stats.sessions : 0,
+      ctaClicks: stats.totalCtaClicks,
     }));
     // Upsert into documentAnalytics
     await ctx.db.insert("documentAnalytics", {
@@ -206,6 +231,8 @@ export const processAndGetDocumentAnalytics = mutation({
       totalScrollEvents,
       completedSessions,
       bouncedSessions,
+      totalCtaClicks,
+      ctaClickRate,
       scrollDepthBuckets,
       deviceBreakdown,
       referrerDomains,
@@ -220,6 +247,8 @@ export const processAndGetDocumentAnalytics = mutation({
       totalScrollEvents,
       completedSessions,
       bouncedSessions,
+      totalCtaClicks,
+      ctaClickRate,
       scrollDepthBuckets,
       deviceBreakdown,
       referrerDomains,
@@ -367,5 +396,45 @@ export const getSessionsForLeadMagnet = query({
     );
     
     return sessionsWithLeads;
+  },
+});
+
+export const trackCtaClick = mutation({
+  args: {
+    sessionId: v.string(),
+    documentId: v.id("leadMagnets"),
+    browserId: v.string(),
+    clickTime: v.number(),
+  },
+  handler: async (ctx, args) => {
+    console.log(`🔘 Tracking CTA click for session: ${args.sessionId}`);
+    
+    // Find the current session
+    const sessions = await ctx.db
+      .query("analyticsSessions")
+      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("sessionId"), args.sessionId),
+          q.eq(q.field("browserId"), args.browserId)
+        )
+      )
+      .collect();
+    
+    if (sessions.length === 0) {
+      console.log(`⚠️ No session found for CTA click tracking: ${args.sessionId} - will be included in session save`);
+      // Don't return error - the click will be included when the session is saved
+      return null;
+    }
+    
+    const session = sessions[0];
+    
+    // Update the session with CTA click data
+    await ctx.db.patch(session._id, {
+      ctaClicks: (session.ctaClicks || 0) + 1,
+    });
+    
+    console.log(`✅ CTA click tracked successfully for session: ${args.sessionId}`);
+    return null;
   },
 }); 

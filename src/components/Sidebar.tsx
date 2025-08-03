@@ -1,8 +1,8 @@
 import { useState } from "react";
 
 interface SidebarProps {
-  currentView: "home" | "lead-magnets" | "leads" | "analytics" | "my-page";
-  onViewChange: (view: "home" | "lead-magnets" | "leads" | "analytics" | "my-page") => void;
+  currentView: "home" | "lead-magnets" | "leads" | "analytics" | "my-page" | "email";
+  onViewChange: (view: "home" | "lead-magnets" | "leads" | "analytics" | "my-page" | "email") => void;
   isCollapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
 }
@@ -33,6 +33,12 @@ export function Sidebar({ currentView, onViewChange, isCollapsed: externalIsColl
       label: "Leads",
       icon: "👥",
       description: "View all collected leads"
+    },
+    {
+      id: "email" as const,
+      label: "Email",
+      icon: "📧",
+      description: "Email campaigns & flows"
     },
     {
       id: "my-page" as const,

@@ -15,7 +15,7 @@ interface FieldConfig {
 
 export function CreateLeadMagnet() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"type" | "fields" | "details">("type");
+  const [step, setStep] = useState<"type" | "fields" | "details" | "cta">("type");
   const [type, setType] = useState<"scratch" | "pdf" | "notion" | "html" | null>(null);
   const [fields, setFields] = useState<FieldConfig>({
     firstName: true,
@@ -30,6 +30,13 @@ export function CreateLeadMagnet() {
   const [notionUrl, setNotionUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // CTA state
+  const [includeCta, setIncludeCta] = useState(false);
+  const [ctaMainText, setCtaMainText] = useState("");
+  const [ctaDescription, setCtaDescription] = useState("");
+  const [ctaButtonText, setCtaButtonText] = useState("");
+  const [ctaLink, setCtaLink] = useState("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createLeadMagnet = useMutation(api.leadMagnets.create);
@@ -50,6 +57,16 @@ export function CreateLeadMagnet() {
 
   const handleFieldsNext = () => {
     setStep("details");
+  };
+
+  const handleDetailsNext = () => {
+    setStep("cta");
+  };
+
+  const handleCtaNext = () => {
+    // This will trigger the form submission
+    const form = document.createElement('form');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,6 +127,15 @@ export function CreateLeadMagnet() {
       }
 
       console.log('Content to save:', finalContent);
+      
+      // Prepare CTA data
+      const ctaData = includeCta ? {
+        mainText: ctaMainText.trim(),
+        description: ctaDescription.trim() || undefined,
+        buttonText: ctaButtonText.trim(),
+        link: ctaLink.trim(),
+      } : undefined;
+
       await createLeadMagnet({
         title: title.trim(),
         description: description.trim() || undefined,
@@ -118,6 +144,7 @@ export function CreateLeadMagnet() {
         fileId,
         notionUrl: notionUrl.trim() || undefined,
         fields,
+        cta: ctaData,
       });
 
       toast.success("Lead magnet created successfully!");
@@ -135,6 +162,7 @@ export function CreateLeadMagnet() {
       case "type": return "Choose Creation Method";
       case "fields": return "Select Form Fields";
       case "details": return "Lead Magnet Details";
+      case "cta": return "Call-to-Action (Optional)";
       default: return "Create Lead Magnet";
     }
   };
@@ -144,6 +172,7 @@ export function CreateLeadMagnet() {
       case "type": return 1;
       case "fields": return 2;
       case "details": return 3;
+      case "cta": return 4;
       default: return 1;
     }
   };
@@ -198,6 +227,17 @@ export function CreateLeadMagnet() {
                   Content
                 </span>
               </div>
+              <div className="w-8 h-0.5 bg-gray-200"></div>
+              <div className="flex items-center space-x-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  getStepNumber() >= 4 ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-500"
+                }`}>
+                  4
+                </div>
+                <span className={`text-sm ${getStepNumber() >= 4 ? "text-blue-600" : "text-gray-500"}`}>
+                  CTA
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -213,6 +253,7 @@ export function CreateLeadMagnet() {
               {step === "type" && "Choose how you want to create your lead magnet"}
               {step === "fields" && "Select which information to collect from your leads"}
               {step === "details" && "Add your lead magnet details and content"}
+              {step === "cta" && "Add an optional call-to-action to your lead magnet"}
             </p>
           </div>
 
@@ -246,26 +287,26 @@ export function CreateLeadMagnet() {
                   </button>
 
                   <button
-                    onClick={() => handleTypeSelect("notion")}
-                    className="p-8 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left group"
+                    disabled
+                    className="p-8 border-2 border-gray-200 rounded-lg bg-gray-50 cursor-not-allowed text-left opacity-60"
                   >
-                    <div className="text-4xl mb-4">📝</div>
-                    <h4 className="font-semibold mb-2 text-lg">Notion Link</h4>
-                    <p className="text-gray-600">Link to a public Notion page that contains your lead magnet content</p>
-                    <div className="mt-4 text-sm text-blue-600 group-hover:text-blue-700">
-                      Ideal for databases, templates, workflows →
+                    <div className="text-4xl mb-4 opacity-50">📝</div>
+                    <h4 className="font-semibold mb-2 text-lg text-gray-500">Notion Link</h4>
+                    <p className="text-gray-400">Link to a public Notion page that contains your lead magnet content</p>
+                    <div className="mt-4 text-sm text-gray-400">
+                      Coming soon →
                     </div>
                   </button>
 
                   <button
-                    onClick={() => handleTypeSelect("html")}
-                    className="p-8 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left group"
+                    disabled
+                    className="p-8 border-2 border-gray-200 rounded-lg bg-gray-50 cursor-not-allowed text-left opacity-60"
                   >
-                    <div className="text-4xl mb-4">🌐</div>
-                    <h4 className="font-semibold mb-2 text-lg">HTML File</h4>
-                    <p className="text-gray-600">Upload a custom HTML file for complete control over styling and layout</p>
-                    <div className="mt-4 text-sm text-blue-600 group-hover:text-blue-700">
-                      Best for custom designs, interactive content →
+                    <div className="text-4xl mb-4 opacity-50">🌐</div>
+                    <h4 className="font-semibold mb-2 text-lg text-gray-500">HTML File</h4>
+                    <p className="text-gray-400">Upload a custom HTML file for complete control over styling and layout</p>
+                    <div className="mt-4 text-sm text-gray-400">
+                      Coming soon →
                     </div>
                   </button>
                 </div>
@@ -273,8 +314,8 @@ export function CreateLeadMagnet() {
             )}
 
             {step === "fields" && (
-              <div>
-                <div className="space-y-6">
+              <div className="flex flex-col h-full">
+                <div className="flex-1 overflow-y-auto space-y-6 pb-6">
                   <div className="flex items-center justify-between p-6 border border-gray-200 rounded-lg bg-blue-50">
                     <div className="flex items-center gap-4">
                       <span className="text-2xl">📧</span>
@@ -316,7 +357,7 @@ export function CreateLeadMagnet() {
                   ))}
                 </div>
 
-                <div className="flex gap-4 pt-8 sticky bottom-0 bg-white py-4 border-t border-gray-200">
+                <div className="flex gap-4 pt-6 bg-white py-4 border-t border-gray-200">
                   <button
                     onClick={() => setStep("type")}
                     className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
@@ -334,86 +375,88 @@ export function CreateLeadMagnet() {
             )}
 
             {step === "details" && (
-              <form onSubmit={handleSubmit} className="space-y-8">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter a compelling title for your lead magnet"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Describe what users will get from this lead magnet"
-                  />
-                </div>
-
-                {type === "scratch" && (
+              <div className="flex flex-col h-full">
+                <form className="flex-1 overflow-y-auto space-y-8 pb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-4">
-                      Content
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Title *
                     </label>
-                    <div className="border border-gray-300 rounded-lg overflow-hidden simple-editor-container">
-                      <SimpleEditor initialContent={content} onChange={(val) => { console.log('Editor onChange:', val); setContent(val); }} />
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter a compelling title for your lead magnet"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Describe what users will get from this lead magnet"
+                    />
+                  </div>
+
+                  {type === "scratch" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-4">
+                        Content
+                      </label>
+                      <div className="border border-gray-300 rounded-lg overflow-hidden simple-editor-container">
+                        <SimpleEditor initialContent={content} onChange={(val) => { console.log('Editor onChange:', val); setContent(val); }} />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {type === "notion" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Notion URL *
-                    </label>
-                    <input
-                      type="url"
-                      value={notionUrl}
-                      onChange={(e) => setNotionUrl(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="https://notion.so/your-page"
-                      required
-                    />
-                    <p className="text-sm text-gray-500 mt-2">
-                      Make sure your Notion page is publicly accessible
-                    </p>
-                  </div>
-                )}
-
-                {(type === "pdf" || type === "html") && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {type === "pdf" ? "PDF File" : "HTML File"} *
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={type === "pdf" ? ".pdf" : ".html"}
-                      onChange={handleFileSelect}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    />
-                    {selectedFile && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ Selected: {selectedFile.name}
+                  {type === "notion" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Notion URL *
+                      </label>
+                      <input
+                        type="url"
+                        value={notionUrl}
+                        onChange={(e) => setNotionUrl(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="https://notion.so/your-page"
+                        required
+                      />
+                      <p className="text-sm text-gray-500 mt-2">
+                        Make sure your Notion page is publicly accessible
                       </p>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                <div className="flex gap-4 pt-6 sticky bottom-0 bg-white py-4 border-t border-gray-200">
+                  {(type === "pdf" || type === "html") && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {type === "pdf" ? "PDF File" : "HTML File"} *
+                      </label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={type === "pdf" ? ".pdf" : ".html"}
+                        onChange={handleFileSelect}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                      {selectedFile && (
+                        <p className="text-sm text-green-600 mt-2">
+                          ✓ Selected: {selectedFile.name}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </form>
+
+                <div className="flex gap-4 pt-6 bg-white py-4 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={() => setStep("fields")}
@@ -422,8 +465,136 @@ export function CreateLeadMagnet() {
                     ← Back
                   </button>
                   <button
+                    type="button"
+                    onClick={handleDetailsNext}
+                    disabled={!title.trim()}
+                    className="px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Continue →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === "cta" && (
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-6 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <span className="text-2xl">🎯</span>
+                      <div>
+                        <h4 className="font-medium text-lg">Include Call-to-Action</h4>
+                        <p className="text-gray-600">Add a compelling CTA to encourage further engagement</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeCta(!includeCta)}
+                      className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                        includeCta
+                          ? "bg-blue-500 border-blue-500"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                    >
+                      {includeCta && <span className="text-white text-sm">✓</span>}
+                    </button>
+                  </div>
+
+                  {includeCta && (
+                    <div className="space-y-6 p-6 border border-gray-200 rounded-lg bg-blue-50">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          CTA Main Text *
+                        </label>
+                        <input
+                          type="text"
+                          value={ctaMainText}
+                          onChange={(e) => setCtaMainText(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="e.g., 'Book a Free Consultation' or 'Download More Resources'"
+                          required={includeCta}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          CTA Description
+                        </label>
+                        <textarea
+                          value={ctaDescription}
+                          onChange={(e) => setCtaDescription(e.target.value)}
+                          rows={3}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Brief description of what happens when they click the CTA"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Button Text *
+                        </label>
+                        <input
+                          type="text"
+                          value={ctaButtonText}
+                          onChange={(e) => setCtaButtonText(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="e.g., 'Book Now', 'Download', 'Get Started'"
+                          required={includeCta}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          CTA Link *
+                        </label>
+                        <input
+                          type="url"
+                          value={ctaLink}
+                          onChange={(e) => setCtaLink(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="https://calendly.com/your-link or https://your-website.com/page"
+                          required={includeCta}
+                        />
+                        <p className="text-sm text-gray-500 mt-2">
+                          This is where users will be directed when they click the CTA
+                        </p>
+                      </div>
+
+                      {/* CTA Preview */}
+                      <div className="mt-6 p-4 bg-white border border-gray-200 rounded-lg">
+                        <h5 className="font-medium text-gray-900 mb-3">Preview:</h5>
+                        <div className="flex justify-center">
+                          <div className="bg-blue-600 text-white p-4 rounded-lg text-center max-w-sm">
+                            <h4 className="font-semibold text-lg mb-2">{ctaMainText || "Your CTA Text"}</h4>
+                            {ctaDescription && (
+                              <p className="text-blue-100 mb-3">{ctaDescription}</p>
+                            )}
+                                                      <a 
+                            href={ctaLink || "#"} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-block bg-white text-blue-600 px-4 py-2 rounded font-medium hover:bg-gray-100 transition-colors"
+                          >
+                            {ctaButtonText || "Click Here"}
+                          </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-6 sticky bottom-0 bg-white py-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setStep("details")}
+                    className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  >
+                    ← Back
+                  </button>
+                  <button
                     type="submit"
-                    disabled={isUploading || !title.trim()}
+                    disabled={isUploading || (includeCta && (!ctaMainText.trim() || !ctaButtonText.trim() || !ctaLink.trim()))}
                     className="px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
                   >
                     {isUploading ? "Creating..." : "Create Lead Magnet"}

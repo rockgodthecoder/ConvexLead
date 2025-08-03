@@ -97,6 +97,12 @@ export const create = mutation({
       phone: v.boolean(),
       company: v.boolean(),
     })),
+    cta: v.optional(v.object({
+      mainText: v.string(),
+      description: v.optional(v.string()),
+      buttonText: v.string(),
+      link: v.string(),
+    })),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -137,6 +143,12 @@ export const update = mutation({
       email: v.boolean(),
       phone: v.boolean(),
       company: v.boolean(),
+    })),
+    cta: v.optional(v.object({
+      mainText: v.string(),
+      description: v.optional(v.string()),
+      buttonText: v.string(),
+      link: v.string(),
     })),
   },
   handler: async (ctx, args) => {

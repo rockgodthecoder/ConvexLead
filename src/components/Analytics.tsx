@@ -334,6 +334,7 @@ export function Analytics() {
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Lead Magnet</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Type</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-gray-700">CTA</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Leads</th>
                   <th className="text-left py-3 px-4 font-medium text-gray-700">Created</th>
                 </tr>
@@ -369,6 +370,19 @@ export function Analytics() {
                         }`}>
                           {magnet.isActive ? 'Active' : 'Inactive'}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {magnet.cta ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-600">✓</span>
+                            <div className="text-xs">
+                              <div className="font-medium text-gray-900">{magnet.cta.mainText}</div>
+                              <div className="text-gray-500">{magnet.cta.buttonText}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">No CTA</span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <span className="font-semibold text-gray-900">{magnet.leadsCount}</span>

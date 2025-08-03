@@ -12,6 +12,13 @@ interface AnalyticsDemoProps {
     isTracking: boolean;
     isTabVisible?: boolean;
     scrollRangeTimeData?: { [range: string]: number };
+    // CTA Tracking Data
+    ctaClicks?: number;
+    // Method 2 Tracking Data
+    pixelBins?: Array<{ y: number; timeSpent: number; isActive: boolean }>;
+    heatmapData?: {
+        activeBinIndex: number | null;
+    };
 }
 
 export function AnalyticsDemo({
@@ -24,6 +31,11 @@ export function AnalyticsDemo({
     isTracking,
     isTabVisible = true,
     scrollRangeTimeData,
+    // CTA Tracking Data
+    ctaClicks = 0,
+    // Method 2 Tracking Data
+    pixelBins,
+    heatmapData,
 }: AnalyticsDemoProps) {
     const [isVisible, setIsVisible] = useState(true);
     const [currentTime, setCurrentTime] = useState(timeOnPage);
@@ -74,7 +86,7 @@ export function AnalyticsDemo({
     }
 
     return (
-        <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs font-mono max-w-xs backdrop-blur-sm border border-white/10">
+        <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs font-mono max-w-xs backdrop-blur-sm border border-white/10 z-50">
             <div className="text-green-400 font-semibold mb-3 flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${isTabVisible ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
                 📊 Analytics Tracking
@@ -111,11 +123,45 @@ export function AnalyticsDemo({
                     <span className="text-orange-300">{scrollEventsCount}</span>
                 </div>
                 <div className="flex justify-between">
+                    <span>CTA clicks:</span>
+                    <span className="text-pink-300">{ctaClicks}</span>
+                </div>
+                <div className="flex justify-between">
                     <span>Tab status:</span>
                     <span className={isTabVisible ? 'text-green-300' : 'text-yellow-300'}>
                         {isTabVisible ? 'Active' : 'Hidden'}
                     </span>
                 </div>
+                
+                {/* Method 2 Tracking Data */}
+                {heatmapData && pixelBins && (
+                    <>
+                        <div className="flex justify-between">
+                            <span>Total Score:</span>
+                            <span className="text-red-300">{Math.round(pixelBins.reduce((sum, bin) => sum + bin.timeSpent, 0))}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Max Score:</span>
+                            <span className="text-red-300">{Math.round(Math.max(...pixelBins.map(bin => bin.timeSpent)))}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Active Bin:</span>
+                            <span className="text-blue-300">{heatmapData.activeBinIndex !== null ? heatmapData.activeBinIndex : 'None'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Pixel Bins:</span>
+                            <span className="text-purple-300">{pixelBins.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Bins with Data:</span>
+                            <span className="text-green-300">{pixelBins.filter(bin => bin.timeSpent > 0).length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>Avg Score/Bin:</span>
+                            <span className="text-yellow-300">{pixelBins.length ? Math.round(pixelBins.reduce((sum, bin) => sum + bin.timeSpent, 0) / pixelBins.length) : 0}</span>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Tab Visibility Notice */}
@@ -130,26 +176,24 @@ export function AnalyticsDemo({
                 </div>
             )}
 
-            {/* Scroll Range Time Table */}
-            {scrollRangeTimeData && (
+            {/* Method 2 Pixel Bins Table */}
+            {pixelBins && pixelBins.length > 0 && (
                 <div className="mt-3">
-                    <div className="font-bold text-white/90 mb-1">Scroll % Range Time (s)</div>
-                    <table className="w-full text-right border-separate border-spacing-y-1">
-                        <thead>
-                            <tr>
-                                <th className="text-left text-white/60 font-normal">Range</th>
-                                <th className="text-white/60 font-normal">Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Object.entries(scrollRangeTimeData).map(([range, ms]) => (
-                                <tr key={range}>
-                                    <td className="text-white/80">{range}%</td>
-                                    <td className="text-white/80">{Math.round(ms / 1000)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <div className="font-bold text-red-300 mb-1 flex items-center gap-1">
+                        <span>✏️</span>
+                        25px Bell Curve Scoring
+                    </div>
+                    <div className="max-h-32 overflow-y-auto">
+                        {pixelBins.map((bin, index) => {
+                            const range = `${bin.y}-${bin.y + 25}px`;
+                            return (
+                                <div key={index} className="flex justify-between text-white/80 text-xs py-0.5">
+                                    <span>{range}:</span>
+                                    <span className="text-white">{bin.timeSpent.toFixed(2)} pts</span>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

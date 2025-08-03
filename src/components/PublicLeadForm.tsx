@@ -122,6 +122,7 @@ export function PublicLeadForm({ shareId }: PublicLeadFormProps) {
               title={magnet.title}
               documentId={magnet._id}
               userEmail={userEmail}
+              cta={magnet.cta}
             />
           </div>
         </div>
