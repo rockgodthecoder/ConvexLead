@@ -80,6 +80,7 @@ const applicationTables = {
     email: v.optional(v.string()),
     // CTA Click Tracking
     ctaClicks: v.optional(v.number()), // Number of CTA clicks in this session
+    ctaClickTimes: v.optional(v.array(v.number())), // Timestamps of CTA clicks
     // Method 2 Pixel Bin Tracking
     pixelBins: v.optional(v.array(v.object({
       y: v.number(),
