@@ -16,11 +16,95 @@ export function MyPage() {
   const user = useQuery(api.auth.loggedInUser);
   const leadMagnets = useQuery(api.leadMagnets.list);
   const [sort, setSort] = useState<SortKey>("latest");
+  const [activeTab, setActiveTab] = useState<"share" | "preview">("preview");
 
   const avatarUrl = user?.name
     ? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E0E7EF&color=374151&size=192`
     : AVATAR_PLACEHOLDER;
 
+
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-10 py-12">
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab("share")}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === "share"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            🔗 Share
+          </button>
+          <button
+            onClick={() => setActiveTab("preview")}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === "preview"
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            👁️ Preview
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="mt-6">
+        {activeTab === "share" && <ShareTab user={user} leadMagnets={leadMagnets} />}
+        {activeTab === "preview" && <PreviewTab user={user} leadMagnets={leadMagnets} sort={sort} setSort={setSort} />}
+      </div>
+    </div>
+  );
+}
+
+function ShareTab({ user, leadMagnets }: { user: any; leadMagnets: any[] | undefined }) {
+  return (
+    <div className="space-y-6">
+      {/* Share Link Section - Using same style as LeadMagnetDetails */}
+      <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
+        <h3 className="font-medium mb-3 text-blue-900">📤 Share Link</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <input
+            type="text"
+            value="https://yourdomain.com/share/your-unique-link"
+            readOnly
+            className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded text-sm font-mono"
+          />
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText("https://yourdomain.com/share/your-unique-link");
+              // You can add toast notification here
+            }}
+            className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 whitespace-nowrap"
+          >
+            Copy Link
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              // Regenerate link functionality
+            }}
+            className="px-3 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+          >
+            Regenerate Link
+          </button>
+          <span className="text-xs text-blue-700">
+            Share this link to collect leads publicly
+          </span>
+        </div>
+      </div>
+
+
+    </div>
+  );
+}
+
+function PreviewTab({ user, leadMagnets, sort, setSort }: { user: any; leadMagnets: any[] | undefined; sort: SortKey; setSort: (sort: SortKey) => void }) {
   let sortedMagnets = leadMagnets ?? [];
   if (sort === "latest") {
     sortedMagnets = sortedMagnets.slice().sort((a, b) => b._creationTime - a._creationTime);
@@ -30,8 +114,12 @@ export function MyPage() {
     sortedMagnets = sortedMagnets.slice().sort((a, b) => (b.leadsCount ?? 0) - (a.leadsCount ?? 0));
   }
 
+  const avatarUrl = user?.name
+    ? `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=E0E7EF&color=374151&size=192`
+    : "https://ui-avatars.com/api/?name=User&background=E0E7EF&color=374151&size=96";
+
   return (
-    <div className="max-w-5xl mx-auto space-y-10 py-12">
+    <div className="space-y-6">
       {/* Channel Header Style */}
       <div className="flex flex-col md:flex-row items-start bg-[#18181b] rounded-2xl shadow-lg p-8 md:p-12 mb-8 gap-8">
         {/* Avatar top left */}
@@ -57,6 +145,7 @@ export function MyPage() {
           </div>
         </div>
       </div>
+
       {/* Book a Call Section */}
       <div className="bg-white rounded-xl shadow-lg p-8 flex flex-col items-center text-center max-w-2xl mx-auto">
         <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to grow your audience?</h3>
@@ -70,6 +159,7 @@ export function MyPage() {
           Book a Call
         </a>
       </div>
+
       {/* Content Section */}
       <div className="bg-transparent">
         <div className="flex items-center gap-2 mb-4">

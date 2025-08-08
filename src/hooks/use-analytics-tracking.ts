@@ -507,7 +507,6 @@ export function useAnalyticsTracking({
                 maxScrollPercentage: finalScrollMetrics.maxScrollPercentage,
                 scrollEvents: finalScrollEvents,
                 userAgent: navigator.userAgent,
-                referrer: document.referrer || '',
                 viewport: {
                     width: window.innerWidth,
                     height: window.innerHeight
@@ -801,7 +800,6 @@ export function useAnalyticsTracking({
                         maxScrollPercentage: finalScrollMetrics.maxScrollPercentage,
                         scrollEvents: finalScrollEvents,
                         userAgent: navigator.userAgent,
-                        referrer: document.referrer || '',
                         viewport: {
                             width: window.innerWidth,
                             height: window.innerHeight
@@ -896,7 +894,6 @@ export function useAnalyticsTracking({
                     maxScrollPercentage: scrollMetricsRef.current.maxScrollPercentage,
                     scrollEvents: scrollEvents.current,
                     userAgent: navigator.userAgent,
-                    referrer: document.referrer || '',
                     viewport: {
                         width: window.innerWidth,
                         height: window.innerHeight

@@ -1,6 +1,7 @@
-import { mutation, action, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const saveSession = mutation({
   args: {
@@ -21,7 +22,6 @@ export const saveSession = mutation({
       documentHeight: v.number(),
     })),
     userAgent: v.string(),
-    referrer: v.optional(v.string()),
     viewport: v.object({ width: v.number(), height: v.number() }),
     email: v.optional(v.string()),
     // CTA Click Tracking
@@ -35,9 +35,6 @@ export const saveSession = mutation({
   },
   handler: async (ctx, args) => {
     // Store scroll events in a separate file if there are many
-    let scrollEventsFileId: any = undefined;
-    // Note: File storage temporarily disabled due to API issues
-
     await ctx.db.insert("analyticsSessions", {
       sessionId: args.sessionId,
       browserId: args.browserId,
@@ -49,11 +46,8 @@ export const saveSession = mutation({
       duration: args.duration,
       maxScrollPercentage: args.maxScrollPercentage,
       scrollEventCount: args.scrollEvents.length,
-      scrollEventsFileId,
       userAgent: args.userAgent,
-      referrer: args.referrer,
       viewport: args.viewport,
-      processed: false,
       createdAt: Date.now(),
       email: args.email,
       ctaClicks: args.ctaClicks || 0,
@@ -80,7 +74,6 @@ export const saveCompleteSession = action({
       documentHeight: v.number(),
     })),
     userAgent: v.string(),
-    referrer: v.optional(v.string()),
     viewport: v.object({ width: v.number(), height: v.number() }),
     email: v.optional(v.string()),
     // CTA Click Tracking
@@ -92,7 +85,6 @@ export const saveCompleteSession = action({
       isActive: v.optional(v.boolean())
     }))),
   },
-  returns: v.null(),
   handler: async (ctx, args) => {
     // Find lead by email if provided
     let leadId: any = undefined;
@@ -190,18 +182,6 @@ export const processAndGetDocumentAnalytics = mutation({
       else if (w < 1024) deviceBreakdown.tablet++;
       else deviceBreakdown.desktop++;
     });
-    // Referrer domains
-    const referrerDomainsMap: Record<string, number> = {};
-    sessions.forEach(s => {
-      if (s.referrer) {
-        try {
-          const url = new URL(s.referrer);
-          const domain = url.hostname;
-          referrerDomainsMap[domain] = (referrerDomainsMap[domain] || 0) + 1;
-        } catch {}
-      }
-    });
-    const referrerDomains = Object.entries(referrerDomainsMap).map(([domain, count]) => ({ domain, count }));
     // Daily stats
     const dailyStatsMap: Record<string, { sessions: number; uniqueVisitors: Set<string>; totalTime: number; totalScroll: number; totalCtaClicks: number; }> = {};
     sessions.forEach(s => {
@@ -235,7 +215,7 @@ export const processAndGetDocumentAnalytics = mutation({
       ctaClickRate,
       scrollDepthBuckets,
       deviceBreakdown,
-      referrerDomains,
+      referrerDomains: [],
       dailyStats,
       lastProcessedSession: undefined,
       lastUpdated: Date.now(),
@@ -251,7 +231,7 @@ export const processAndGetDocumentAnalytics = mutation({
       ctaClickRate,
       scrollDepthBuckets,
       deviceBreakdown,
-      referrerDomains,
+      referrerDomains: [],
       dailyStats,
     };
   },
@@ -299,11 +279,8 @@ export const recordFormView = mutation({
       duration: 0, // Form view duration is 0 since we're just recording the view
       maxScrollPercentage: 0,
       scrollEventCount: 0,
-      scrollEventsFileId: undefined,
       userAgent: "Form View Tracking",
-      referrer: "Direct", // We'll get the actual referrer from the client
       viewport: { width: 0, height: 0 }, // Will be updated if needed
-      processed: false,
       createdAt: Date.now(),
     });
     
@@ -399,6 +376,39 @@ export const getSessionsForLeadMagnet = query({
   },
 });
 
+export const getAverageViewTime = query({
+  args: {
+    leadMagnetId: v.id("leadMagnets"),
+  },
+  handler: async (ctx, args) => {
+    // Get all sessions for this lead magnet
+    const sessions = await ctx.db
+      .query("analyticsSessions")
+      .withIndex("by_document", (q) => q.eq("documentId", args.leadMagnetId))
+      .collect();
+    
+    // Filter out sessions with duration 0 (form views) and calculate average
+    const validSessions = sessions.filter(session => session.duration > 0);
+    
+    if (validSessions.length === 0) {
+      return {
+        averageViewTime: 0,
+        totalSessions: 0,
+        totalTimeSpent: 0
+      };
+    }
+    
+    const totalTimeSpent = validSessions.reduce((sum, session) => sum + (session.duration || 0), 0);
+    const averageViewTime = Math.round(totalTimeSpent / validSessions.length);
+    
+    return {
+      averageViewTime,
+      totalSessions: validSessions.length,
+      totalTimeSpent
+    };
+  },
+});
+
 export const trackCtaClick = mutation({
   args: {
     sessionId: v.string(),
@@ -408,33 +418,280 @@ export const trackCtaClick = mutation({
   },
   handler: async (ctx, args) => {
     console.log(`🔘 Tracking CTA click for session: ${args.sessionId}`);
-    
-    // Find the current session
     const sessions = await ctx.db
       .query("analyticsSessions")
       .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-      .filter((q) => 
+      .filter((q) =>
         q.and(
           q.eq(q.field("sessionId"), args.sessionId),
           q.eq(q.field("browserId"), args.browserId)
         )
       )
       .collect();
-    
+
     if (sessions.length === 0) {
       console.log(`⚠️ No session found for CTA click tracking: ${args.sessionId} - will be included in session save`);
-      // Don't return error - the click will be included when the session is saved
+      return null;
+    }
+
+    const session = sessions[0] as any;
+    await ctx.db.patch(session._id, {
+      ctaClicks: (session.ctaClicks || 0) + 1,
+      ctaClickTimes: Array.isArray(session.ctaClickTimes)
+        ? [...session.ctaClickTimes, args.clickTime]
+        : [args.clickTime],
+    });
+
+    console.log(`✅ CTA click tracked successfully for session: ${args.sessionId}`);
+    return null;
+  },
+});
+
+export const getSessionsForAllLeadMagnets = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Get all lead magnets for this user
+    const leadMagnets = await ctx.db
+      .query("leadMagnets")
+      .withIndex("by_user", (q) => q.eq("createdBy", userId))
+      .collect();
+
+    if (leadMagnets.length === 0) {
+      return [];
+    }
+
+    const leadMagnetIds = leadMagnets.map(m => m._id);
+
+    // Get all sessions for user's lead magnets
+    const allSessions = await ctx.db
+      .query("analyticsSessions")
+      .collect()
+      .then(sessions => sessions.filter(session => leadMagnetIds.includes(session.documentId)))
+      .then(sessions => sessions.sort((a, b) => b.createdAt - a.createdAt));
+
+    return allSessions;
+  },
+});
+
+export const getOverallLeadGenerationPerformance = query({
+  args: {
+    timeRange: v.optional(v.number()), // days, default 30
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const timeRange = args.timeRange || 30;
+    const cutoffTime = Date.now() - timeRange * 24 * 60 * 60 * 1000;
+
+    // Get all lead magnets for this user
+    const leadMagnets = await ctx.db
+      .query("leadMagnets")
+      .withIndex("by_user", (q) => q.eq("createdBy", userId))
+      .collect();
+
+    if (leadMagnets.length === 0) {
+      return {
+        totalLeadMagnets: 0,
+        activeLeadMagnets: 0,
+        totalLeads: 0,
+        totalViews: 0,
+        overallConversionRate: 0,
+        averageLeadsPerMagnet: 0,
+        averageViewsPerMagnet: 0,
+        topPerformingMagnets: [],
+        performanceByType: {},
+        dailyLeadTrends: [],
+        totalSessions: 0,
+        totalTimeSpent: 0,
+        averageSessionDuration: 0,
+        averageScrollDepth: 0,
+        completionRate: 0,
+        bounceRate: 0,
+        totalCtaClicks: 0,
+        ctaClickRate: 0,
+        deviceBreakdown: { mobile: 0, tablet: 0, desktop: 0 },
+      };
+    }
+
+    const leadMagnetIds = leadMagnets.map(m => m._id);
+
+    // Get all leads for user's lead magnets
+    const allEngagements = await ctx.db
+      .query("leadMagnetEngagements")
+      .collect()
+      .then(engagements => engagements.filter(e => leadMagnetIds.includes(e.leadMagnetId)));
+
+    // Get all sessions for user's lead magnets
+    const allSessions = await ctx.db
+      .query("analyticsSessions")
+      .collect()
+      .then(sessions => sessions.filter(s => leadMagnetIds.includes(s.documentId)));
+
+    // Filter by time range
+    const recentSessions = allSessions.filter(s => s.createdAt >= cutoffTime);
+    const recentEngagements = allEngagements.filter(e => e.lastEngagement >= cutoffTime);
+
+    // Calculate core metrics
+    const totalLeadMagnets = leadMagnets.length;
+    const activeLeadMagnets = leadMagnets.filter(m => m.isActive).length;
+    const totalLeads = allEngagements.length;
+    const totalViews = leadMagnets.reduce((sum, m) => sum + (m.formViews || 0), 0);
+    const overallConversionRate = totalViews > 0 ? Math.round((totalLeads / totalViews) * 100) : 0;
+    const averageLeadsPerMagnet = totalLeadMagnets > 0 ? Math.round(totalLeads / totalLeadMagnets) : 0;
+    const averageViewsPerMagnet = totalLeadMagnets > 0 ? Math.round(totalViews / totalLeadMagnets) : 0;
+
+    // Top performing magnets (by leads)
+    const magnetsWithLeads = await Promise.all(
+      leadMagnets.map(async (magnet) => {
+        const magnetLeads = allEngagements.filter(e => e.leadMagnetId === magnet._id).length;
+        const magnetViews = magnet.formViews || 0;
+        const magnetConversionRate = magnetViews > 0 ? Math.round((magnetLeads / magnetViews) * 100) : 0;
+        
+        return {
+          _id: magnet._id,
+          title: magnet.title,
+          type: magnet.type,
+          leads: magnetLeads,
+          views: magnetViews,
+          conversionRate: magnetConversionRate,
+          isActive: magnet.isActive,
+        };
+      })
+    );
+
+    const topPerformingMagnets = magnetsWithLeads
+      .sort((a, b) => b.leads - a.leads)
+      .slice(0, 5);
+
+    // Performance by type
+    const performanceByType = magnetsWithLeads.reduce((acc, magnet) => {
+      if (!acc[magnet.type]) {
+        acc[magnet.type] = { totalLeads: 0, totalViews: 0, count: 0, conversionRate: 0, averageLeads: 0 };
+      }
+      acc[magnet.type].totalLeads += magnet.leads;
+      acc[magnet.type].totalViews += magnet.views;
+      acc[magnet.type].count += 1;
+      return acc;
+    }, {} as Record<string, { totalLeads: number; totalViews: number; count: number; conversionRate: number; averageLeads: number }>);
+
+    // Calculate conversion rates by type
+    Object.keys(performanceByType).forEach(type => {
+      const data = performanceByType[type];
+      data.conversionRate = data.totalViews > 0 ? Math.round((data.totalLeads / data.totalViews) * 100) : 0;
+      data.averageLeads = data.count > 0 ? Math.round(data.totalLeads / data.count) : 0;
+    });
+
+    // Daily lead trends
+    const leadsByDate = new Map<string, number>();
+    allEngagements.forEach(engagement => {
+      const date = new Date(engagement.lastEngagement).toISOString().split('T')[0];
+      leadsByDate.set(date, (leadsByDate.get(date) || 0) + 1);
+    });
+
+    const dailyLeadTrends = Array.from(leadsByDate.entries())
+      .map(([date, count]) => ({ date, leads: count }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Session analytics
+    const totalSessions = allSessions.length;
+    const totalTimeSpent = allSessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const averageSessionDuration = totalSessions > 0 ? Math.round(totalTimeSpent / totalSessions) : 0;
+    const averageScrollDepth = totalSessions > 0 
+      ? Math.round(allSessions.reduce((sum, s) => sum + (s.maxScrollPercentage || 0), 0) / totalSessions)
+      : 0;
+    const completionRate = totalSessions > 0 
+      ? Math.round((allSessions.filter(s => (s.maxScrollPercentage || 0) >= 90).length / totalSessions) * 100)
+      : 0;
+    const bounceRate = totalSessions > 0
+      ? Math.round((allSessions.filter(s => (s.duration || 0) < 10).length / totalSessions) * 100)
+      : 0;
+
+    // CTA analytics
+    const totalCtaClicks = allSessions.reduce((sum, s) => sum + (s.ctaClicks || 0), 0);
+    const sessionsWithCtaClicks = allSessions.filter(s => (s.ctaClicks || 0) > 0).length;
+    const ctaClickRate = totalSessions > 0 ? Math.round((sessionsWithCtaClicks / totalSessions) * 100) : 0;
+
+    // Device breakdown
+    const deviceBreakdown = { mobile: 0, tablet: 0, desktop: 0 };
+    allSessions.forEach(s => {
+      const w = s.viewport?.width || 0;
+      if (w < 768) deviceBreakdown.mobile++;
+      else if (w < 1024) deviceBreakdown.tablet++;
+      else deviceBreakdown.desktop++;
+    });
+
+    return {
+      totalLeadMagnets,
+      activeLeadMagnets,
+      totalLeads,
+      totalViews,
+      overallConversionRate,
+      averageLeadsPerMagnet,
+      averageViewsPerMagnet,
+      topPerformingMagnets,
+      performanceByType,
+      dailyLeadTrends,
+      totalSessions,
+      totalTimeSpent,
+      averageSessionDuration,
+      averageScrollDepth,
+      completionRate,
+      bounceRate,
+      totalCtaClicks,
+      ctaClickRate,
+      deviceBreakdown,
+    };
+  },
+});
+
+
+
+export const getBaseScreenshot = query({
+  args: {
+    documentId: v.id("leadMagnets"),
+  },
+  handler: async (ctx, args) => {
+    const document = await ctx.db.get(args.documentId);
+    
+    if (!document || !document.baseScreenshotFileId) {
       return null;
     }
     
-    const session = sessions[0];
-    
-    // Update the session with CTA click data
-    await ctx.db.patch(session._id, {
-      ctaClicks: (session.ctaClicks || 0) + 1,
+    try {
+      const url = await ctx.storage.getUrl(document.baseScreenshotFileId);
+      return {
+        url,
+        capturedAt: document.baseScreenshotCapturedAt,
+      };
+    } catch (error) {
+      console.error(`❌ Error getting base screenshot URL:`, error);
+      return null;
+    }
+  },
+});
+
+
+
+
+
+export const updateScreenshotFields = mutation({
+  args: {
+    documentId: v.id("leadMagnets"),
+    fileId: v.id("_storage"),
+    capturedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.documentId, {
+      baseScreenshotFileId: args.fileId,
+      baseScreenshotCapturedAt: args.capturedAt,
     });
-    
-    console.log(`✅ CTA click tracked successfully for session: ${args.sessionId}`);
-    return null;
   },
 }); 

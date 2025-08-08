@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import html2canvas from 'html2canvas';
 import { TipTapContentViewer } from './TipTapContentViewer';
 import { Id } from '../../convex/_generated/dataModel';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 import { useAnalyticsTracking } from '../hooks/use-analytics-tracking';
 import { AnalyticsDemo } from './AnalyticsDemo';
@@ -28,6 +31,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdfjs/build/pdf.worker.mjs";
 interface RenderedPage {
   pageNum: number;
   canvas: HTMLCanvasElement;
+  textLayer?: HTMLDivElement;
+  annotationLayer?: HTMLDivElement;
 }
 
 export function UnifiedContentViewer({ 
@@ -46,9 +51,17 @@ export function UnifiedContentViewer({
   const [pdfDocument, setPdfDocument] = useState<any>(null);
   const [renderedPages, setRenderedPages] = useState<RenderedPage[]>([]);
   const [scale, setScale] = useState(1.5);
+
+  // Screenshot capture state
+  const [baseScreenshotCaptured, setBaseScreenshotCaptured] = useState(false);
+  const baseScreenshotCapturedRef = useRef(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Convex mutations
+  const generateUploadUrl = useMutation(api.analytics.generateScreenshotUploadUrl);
+  const saveBaseScreenshot = useMutation(api.analytics.saveBaseScreenshot);
 
   // Analytics tracking for all content types
   const analyticsState = useAnalyticsTracking({
@@ -185,6 +198,75 @@ export function UnifiedContentViewer({
       </div>
     );
   };
+
+  // Capture base screenshot for heatmap generation
+  const captureBaseScreenshot = useCallback(async () => {
+    console.log('🔍 captureBaseScreenshot called with:', {
+      hasContainer: !!containerRef.current,
+      documentId,
+      alreadyCaptured: baseScreenshotCapturedRef.current
+    });
+    
+    if (!containerRef.current || !documentId || baseScreenshotCapturedRef.current) {
+      console.log('❌ Screenshot capture skipped - missing requirements');
+      return;
+    }
+
+    try {
+      console.log('📸 Capturing base screenshot...');
+      
+      // Wait for content to be fully rendered
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Capture the rendered content
+      const canvas = await html2canvas(containerRef.current, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 1,
+        width: containerRef.current.scrollWidth,
+        height: containerRef.current.scrollHeight,
+        backgroundColor: '#ffffff'
+      });
+      
+      // Convert canvas to blob
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/png', 1.0);
+      });
+      
+      if (!blob) {
+        throw new Error('Failed to create screenshot blob');
+      }
+      
+      // Generate upload URL and upload file
+      const uploadUrl = await generateUploadUrl();
+      
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/png' },
+        body: blob,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload screenshot');
+      }
+      
+      const { storageId } = await uploadResponse.json();
+      
+      // Save screenshot reference to database
+      await saveBaseScreenshot({
+        documentId,
+        fileId: storageId,
+      });
+      
+      setBaseScreenshotCaptured(true);
+      baseScreenshotCapturedRef.current = true;
+      
+      console.log('✅ Base screenshot captured and saved successfully');
+    } catch (error) {
+      console.error('❌ Error capturing base screenshot:', error);
+      // Don't throw error - screenshot is optional
+    }
+  }, [documentId, generateUploadUrl, saveBaseScreenshot]);
 
   // Download heatmap function (like PDF-HTML Method 2)
   const downloadHeatmap = async () => {
@@ -331,7 +413,19 @@ export function UnifiedContentViewer({
     
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
+      
+      // Get the original page dimensions
+      const originalViewport = page.getViewport({ scale: 1.0 });
+      const originalWidth = originalViewport.width;
+      const originalHeight = originalViewport.height;
+      
+      // Calculate the scale to fit the page within a reasonable container width
+      // while maintaining aspect ratio
+      const maxContainerWidth = 800; // Maximum width for the container
+      const containerScale = Math.min(scale, maxContainerWidth / originalWidth);
+      
+      // Create viewport with calculated scale
+      const viewport = page.getViewport({ scale: containerScale });
       
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
@@ -343,9 +437,11 @@ export function UnifiedContentViewer({
       canvas.width = viewport.width * pixelRatio;
       canvas.height = viewport.height * pixelRatio;
       
-      // Set CSS size
+      // Set CSS size to match the viewport dimensions
       canvas.style.width = viewport.width + 'px';
       canvas.style.height = viewport.height + 'px';
+      canvas.style.maxWidth = '100%';
+      canvas.style.height = 'auto';
       
       if (context) {
         // Scale the context to account for device pixel ratio
@@ -357,8 +453,150 @@ export function UnifiedContentViewer({
         };
         await page.render(renderContext).promise;
       }
+
+      // Create text layer
+      let textLayer: HTMLDivElement | undefined;
+      try {
+        const textContent = await page.getTextContent();
+        
+        // Create text layer container
+        textLayer = document.createElement('div');
+        textLayer.style.position = 'absolute';
+        textLayer.style.left = '0';
+        textLayer.style.top = '0';
+        textLayer.style.right = '0';
+        textLayer.style.bottom = '0';
+        textLayer.style.overflow = 'hidden';
+        textLayer.style.opacity = '0.2';
+        textLayer.style.lineHeight = '1.0';
+        textLayer.style.pointerEvents = 'auto';
+        textLayer.style.userSelect = 'text';
+        textLayer.style.cursor = 'text';
+        textLayer.style.zIndex = '10';
+        textLayer.style.display = 'block';
+
+        // Create text layer content
+        const textLayerDiv = document.createElement('div');
+        textLayerDiv.style.position = 'absolute';
+        textLayerDiv.style.left = '0';
+        textLayerDiv.style.top = '0';
+        textLayerDiv.style.right = '0';
+        textLayerDiv.style.bottom = '0';
+        textLayerDiv.style.overflow = 'hidden';
+        textLayerDiv.style.opacity = '0.2';
+        textLayerDiv.style.lineHeight = '1.0';
+        textLayerDiv.style.pointerEvents = 'auto';
+        textLayerDiv.style.userSelect = 'text';
+        textLayerDiv.style.cursor = 'text';
+        textLayerDiv.style.zIndex = '10';
+
+        // Render text content
+        const transform = viewport.transform;
+        const transformStr = `matrix(${transform.join(', ')})`;
+
+        textContent.items.forEach((item: any) => {
+          const tx = transform[0] * item.transform[4] + transform[2] * item.transform[5] + transform[4];
+          const ty = transform[1] * item.transform[4] + transform[3] * item.transform[5] + transform[5];
+          
+          const span = document.createElement('span');
+          span.textContent = item.str;
+          span.style.position = 'absolute';
+          span.style.left = `${tx}px`;
+          span.style.top = `${ty}px`;
+          span.style.fontSize = `${Math.abs(item.height * transform[3])}px`;
+          span.style.fontFamily = item.fontName || 'sans-serif';
+          span.style.transform = transformStr;
+          span.style.transformOrigin = '0% 0%';
+          span.style.color = 'transparent';
+          span.style.whiteSpace = 'pre';
+          span.style.cursor = 'text';
+          span.style.pointerEvents = 'auto';
+          span.style.userSelect = 'text';
+          
+          textLayerDiv.appendChild(span);
+        });
+
+        textLayer.appendChild(textLayerDiv);
+      } catch (textError) {
+        console.warn(`Could not extract text from page ${pageNum}:`, textError);
+      }
+
+      // Create annotation layer for hyperlinks
+      let annotationLayer: HTMLDivElement | undefined;
+      try {
+        const annotations = await page.getAnnotations();
+        
+        if (annotations && annotations.length > 0) {
+          // Create annotation layer container
+          annotationLayer = document.createElement('div');
+          annotationLayer.style.position = 'absolute';
+          annotationLayer.style.left = '0';
+          annotationLayer.style.top = '0';
+          annotationLayer.style.right = '0';
+          annotationLayer.style.bottom = '0';
+          annotationLayer.style.overflow = 'hidden';
+          annotationLayer.style.pointerEvents = 'auto';
+          annotationLayer.style.zIndex = '15'; // Above text layer
+          annotationLayer.style.display = 'block';
+
+          annotations.forEach((annotation: any) => {
+            // Handle hyperlink annotations
+            if (annotation.subtype === 'Link' && annotation.url) {
+              const linkRect = annotation.rect;
+              const [x1, y1, x2, y2] = linkRect;
+              
+              // Convert PDF coordinates to viewport coordinates
+              const viewport = page.getViewport({ scale });
+              const transform = viewport.transform;
+              
+              const left = transform[0] * x1 + transform[2] * y1 + transform[4];
+              const top = transform[1] * x1 + transform[3] * y1 + transform[5];
+              const width = (x2 - x1) * transform[0];
+              const height = (y2 - y1) * transform[3];
+              
+              const linkElement = document.createElement('a');
+              linkElement.href = annotation.url;
+              linkElement.target = '_blank';
+              linkElement.rel = 'noopener noreferrer';
+              linkElement.style.position = 'absolute';
+              linkElement.style.left = `${left}px`;
+              linkElement.style.top = `${top}px`;
+              linkElement.style.width = `${Math.abs(width)}px`;
+              linkElement.style.height = `${Math.abs(height)}px`;
+              linkElement.style.cursor = 'pointer';
+              linkElement.style.zIndex = '1';
+              linkElement.style.backgroundColor = 'transparent';
+              linkElement.style.border = 'none';
+              linkElement.style.outline = 'none';
+              
+              // Add hover effect
+              linkElement.addEventListener('mouseenter', () => {
+                linkElement.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+                linkElement.style.border = '1px solid rgba(0, 123, 255, 0.3)';
+              });
+              
+              linkElement.addEventListener('mouseleave', () => {
+                linkElement.style.backgroundColor = 'transparent';
+                linkElement.style.border = 'none';
+              });
+              
+              // Add click tracking for analytics
+              linkElement.addEventListener('click', (e) => {
+                console.log('🔗 PDF link clicked:', annotation.url);
+                if (activeAnalytics.trackCtaClickEvent) {
+                  activeAnalytics.trackCtaClickEvent();
+                }
+              });
+              
+              annotationLayer!.appendChild(linkElement);
+            }
+          });
+        }
+      } catch (annotationError) {
+        console.warn(`Could not extract annotations from page ${pageNum}:`, annotationError);
+      }
       
-      pages.push({ pageNum, canvas });
+      pages.push({ pageNum, canvas, textLayer, annotationLayer });
     }
     
     setRenderedPages(pages);
@@ -370,6 +608,17 @@ export function UnifiedContentViewer({
       loadAndConvertPDF(fileUrl);
     }
   }, [type, fileUrl, scale]);
+
+  // Update text layer visibility when toggle changes
+  useEffect(() => {
+    renderedPages.forEach(({ textLayer }) => {
+      if (textLayer) {
+        textLayer.style.display = 'block';
+      }
+    });
+  }, [renderedPages]);
+
+
 
   return (
     <>
@@ -415,12 +664,15 @@ export function UnifiedContentViewer({
                 
                 {!isLoading && !hasError && renderedPages.length > 0 && (
                   <div 
-                    ref={containerRef}
+                    ref={(el) => {
+                      containerRef.current = el;
+                      console.log('🔍 Container ref set:', !!el);
+                    }}
                     className="relative"
                   >
                     <div className="flex flex-col items-center p-4">
-                      {renderedPages.map(({ pageNum, canvas }) => (
-                        <div key={pageNum} className="mb-4 text-center">
+                      {renderedPages.map(({ pageNum, canvas, textLayer, annotationLayer }) => (
+                        <div key={pageNum} className="mb-6 text-center relative w-full">
                           <div className="text-sm text-gray-500 mb-2">Page {pageNum}</div>
                           <div 
                             ref={(el) => {
@@ -428,7 +680,40 @@ export function UnifiedContentViewer({
                                 el.appendChild(canvas);
                               }
                             }} 
+                            className="relative inline-block"
+                            style={{
+                              maxWidth: '100%',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                              borderRadius: '8px',
+                              overflow: 'hidden'
+                            }}
                           />
+                          {/* Add text layer overlay */}
+                          {textLayer && (
+                            <div 
+                              ref={(el) => {
+                                if (el && !el.contains(textLayer)) {
+                                  el.appendChild(textLayer);
+                                  // Text layer is always visible
+                                  textLayer.style.display = 'block';
+                                }
+                              }}
+                              className="absolute inset-0"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                          )}
+                          {/* Add annotation layer overlay for hyperlinks */}
+                          {annotationLayer && (
+                            <div 
+                              ref={(el) => {
+                                if (el && !el.contains(annotationLayer)) {
+                                  el.appendChild(annotationLayer);
+                                }
+                              }}
+                              className="absolute inset-0"
+                              style={{ pointerEvents: 'none' }}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -442,7 +727,13 @@ export function UnifiedContentViewer({
             )}
             
             {type === "scratch" && content && (
-              <div className="relative">
+              <div 
+                ref={(el) => {
+                  containerRef.current = el;
+                  console.log('🔍 Scratch container ref set:', !!el);
+                }}
+                className="relative"
+              >
                 <TipTapContentViewer content={content} />
                 {/* Method 2 Overlays */}
                 <HeatmapOverlay />
@@ -464,7 +755,13 @@ export function UnifiedContentViewer({
             )}
             
             {type === "html" && content && (
-              <div className="relative">
+              <div 
+                ref={(el) => {
+                  containerRef.current = el;
+                  console.log('🔍 HTML container ref set:', !!el);
+                }}
+                className="relative"
+              >
                 <div 
                   className="text-gray-800 text-base leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: content }}

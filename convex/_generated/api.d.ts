@@ -16,9 +16,11 @@ import type {
 import type * as analytics from "../analytics.js";
 import type * as analyticsInternal from "../analyticsInternal.js";
 import type * as auth from "../auth.js";
+import type * as http from "../http.js";
 import type * as leadMagnets from "../leadMagnets.js";
 import type * as leads from "../leads.js";
 import type * as router from "../router.js";
+import type * as screenshot from "../screenshot.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -32,9 +34,11 @@ declare const fullApi: ApiFromModules<{
   analytics: typeof analytics;
   analyticsInternal: typeof analyticsInternal;
   auth: typeof auth;
+  http: typeof http;
   leadMagnets: typeof leadMagnets;
   leads: typeof leads;
   router: typeof router;
+  screenshot: typeof screenshot;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

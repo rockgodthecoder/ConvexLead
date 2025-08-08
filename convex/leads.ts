@@ -50,8 +50,8 @@ export const list = query({
 });
 
 export const listAll = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { leadMagnetId: v.optional(v.id("leadMagnets")) },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
@@ -68,9 +68,12 @@ export const listAll = query({
       return [];
     }
 
-    // Get all engagements for user's lead magnets
+    // Filter by specific lead magnet if provided
+    const targetMagnetIds = args.leadMagnetId ? [args.leadMagnetId] : leadMagnetIds;
+
+    // Get all engagements for user's lead magnets (or specific magnet)
     const allEngagements: any[] = [];
-    for (const magnetId of leadMagnetIds) {
+    for (const magnetId of targetMagnetIds) {
       const engagements = await ctx.db
         .query("leadMagnetEngagements")
         .withIndex("by_lead_magnet", (q) => q.eq("leadMagnetId", magnetId))
@@ -84,7 +87,13 @@ export const listAll = query({
       uniqueLeadIds.map(async (leadId) => {
         const lead = await ctx.db.get(leadId);
         if (!lead) return null;
-        const leadEngagements = allEngagements.filter(e => e.leadId === leadId);
+        
+        // If filtering by specific magnet, only include engagements for that magnet
+        // Otherwise, include all engagements for the lead
+        const leadEngagements = args.leadMagnetId 
+          ? allEngagements.filter(e => e.leadId === leadId && e.leadMagnetId === args.leadMagnetId)
+          : allEngagements.filter(e => e.leadId === leadId);
+          
         const engagementsWithMagnetInfo = leadEngagements.map(engagement => {
           const magnet = leadMagnets.find(m => m._id === engagement.leadMagnetId);
           return {
@@ -93,6 +102,7 @@ export const listAll = query({
             leadMagnetType: magnet?.type || "unknown",
           };
         });
+        
         return {
           ...lead,
           engagements: engagementsWithMagnetInfo,

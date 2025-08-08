@@ -21,24 +21,24 @@ function LeadMagnetListItem({ magnet, onClick }: { magnet: any; onClick: () => v
   const lastUpdated = magnet.lastUpdated ?? magnet._creationTime;
   return (
     <div
-      className="flex items-center px-4 py-3 hover:bg-gray-50 transition cursor-pointer border-b"
+      className="flex items-center px-3 py-2 hover:bg-gray-50 transition cursor-pointer border-b"
       onClick={onClick}
     >
       {/* Icon/avatar */}
-      <div className="w-10 h-10 flex items-center justify-center rounded bg-gray-100 mr-4">
-        <span className="text-2xl">🧲</span>
+      <div className="w-8 h-8 flex items-center justify-center rounded bg-gray-100 mr-3">
+        <span className="text-lg">🧲</span>
       </div>
       {/* Title */}
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-gray-900 truncate">{magnet.title}</div>
+        <div className="font-medium text-gray-900 truncate text-sm">{magnet.title}</div>
       </div>
       {/* Responses */}
-      <div className="w-24 text-center text-gray-700">{magnet.leadsCount ?? "-"}</div>
+      <div className="w-20 text-center text-gray-700 text-xs">{magnet.leadsCount ?? "-"}</div>
       {/* Updated */}
-      <div className="w-32 text-center text-gray-700">{new Date(lastUpdated).toLocaleDateString()}</div>
+      <div className="w-28 text-center text-gray-700 text-xs">{new Date(lastUpdated).toLocaleDateString()}</div>
       {/* Actions */}
-      <div className="w-10 flex justify-center">
-        <button className="text-gray-400 hover:text-gray-600">
+      <div className="w-8 flex justify-center">
+        <button className="text-gray-400 hover:text-gray-600 text-sm">
           <span className="sr-only">Actions</span>
           &#x22EE;
         </button>
@@ -86,38 +86,38 @@ export function LeadMagnetDashboard({ onCollapseSidebar }: LeadMagnetDashboardPr
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Lead Magnets</h1>
-          <p className="text-gray-600 mt-2">Create and manage your lead generation campaigns</p>
+          <h1 className="text-2xl font-bold text-gray-900">Lead Magnets</h1>
+          <p className="text-gray-600 mt-1 text-sm">Create and manage your lead generation campaigns</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Date filter dropdown */}
           <select
             value={dateSort}
             onChange={e => setDateSort(e.target.value as "newest" | "oldest")}
-            className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-gray-300 rounded px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="newest">Date created (newest)</option>
             <option value="oldest">Date created (oldest)</option>
           </select>
           <button
-            className={`p-2 rounded ${view === "grid" ? "bg-blue-100" : ""}`}
+            className={`p-1.5 rounded ${view === "grid" ? "bg-blue-100" : ""}`}
             onClick={() => setView("grid")}
             aria-label="Grid view"
           >
-            <GridIcon />
+            <GridIcon className="w-4 h-4" />
           </button>
           <button
-            className={`p-2 rounded ${view === "list" ? "bg-blue-100" : ""}`}
+            className={`p-1.5 rounded ${view === "list" ? "bg-blue-100" : ""}`}
             onClick={() => setView("list")}
             aria-label="List view"
           >
-            <ListIcon />
+            <ListIcon className="w-4 h-4" />
           </button>
         <button
             onClick={() => navigate("/create-lead-magnet")}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors ml-4"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors ml-3 text-sm"
         >
           Create Lead Magnet
         </button>
@@ -125,19 +125,19 @@ export function LeadMagnetDashboard({ onCollapseSidebar }: LeadMagnetDashboardPr
       </div>
 
       {leadMagnets.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="text-gray-400 text-6xl mb-4">📧</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No lead magnets yet</h3>
-          <p className="text-gray-600 mb-6">Create your first lead magnet to start collecting leads</p>
+        <div className="text-center py-12">
+          <div className="text-gray-400 text-4xl mb-3">📧</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No lead magnets yet</h3>
+          <p className="text-gray-600 mb-4 text-sm">Create your first lead magnet to start collecting leads</p>
           <button
             onClick={() => navigate("/create-lead-magnet")}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
           >
             Create Your First Lead Magnet
           </button>
         </div>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedLeadMagnets.map((magnet) => (
             <LeadMagnetCard
               key={magnet._id}
@@ -149,12 +149,12 @@ export function LeadMagnetDashboard({ onCollapseSidebar }: LeadMagnetDashboardPr
       ) : (
         <div className="rounded-lg border bg-white overflow-hidden">
           {/* Header */}
-          <div className="flex items-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase bg-gray-50 border-b">
-            <div className="w-10 mr-4"></div>
+          <div className="flex items-center px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase bg-gray-50 border-b">
+            <div className="w-8 mr-3"></div>
             <div className="flex-1 min-w-0">Title</div>
-            <div className="w-24 text-center">Responses</div>
-            <div className="w-32 text-center">Updated</div>
-            <div className="w-10"></div>
+            <div className="w-20 text-center">Responses</div>
+            <div className="w-28 text-center">Updated</div>
+            <div className="w-8"></div>
           </div>
           {/* Rows */}
           {sortedLeadMagnets.map((magnet) => (

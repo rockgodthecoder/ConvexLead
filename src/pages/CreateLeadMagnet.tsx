@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { SimpleEditor } from "../components/tiptap-templates/simple/simple-editor";
+import { TipTapContentViewer } from "../components/TipTapContentViewer";
 
 interface FieldConfig {
   firstName: boolean;
@@ -41,6 +42,9 @@ export function CreateLeadMagnet() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createLeadMagnet = useMutation(api.leadMagnets.create);
   const generateUploadUrl = useMutation(api.leadMagnets.generateUploadUrl);
+  const getShareId = useMutation(api.leadMagnets.getShareId);
+  const captureShareLinkScreenshot = useAction(api.screenshot.captureShareLinkScreenshot);
+
 
   const handleTypeSelect = (selectedType: "scratch" | "pdf" | "notion" | "html") => {
     setType(selectedType);
@@ -81,6 +85,24 @@ export function CreateLeadMagnet() {
         return;
       }
       setSelectedFile(file);
+    }
+  };
+
+    // Capture screenshot using action directly
+  const captureScreenshot = async (leadMagnetId: string, shareId: string) => {
+    try {
+      console.log('📸 Capturing share link screenshot...');
+      console.log('🌐 Calling action with:', { documentId: leadMagnetId, shareId });
+      
+      const fileId = await captureShareLinkScreenshot({ 
+        documentId: leadMagnetId as any, 
+        shareId: shareId 
+      });
+      
+      console.log('✅ Screenshot captured and saved successfully:', fileId);
+    } catch (error) {
+      console.error('❌ Error capturing screenshot:', error);
+      // Don't throw error - screenshot is optional
     }
   };
 
@@ -136,7 +158,7 @@ export function CreateLeadMagnet() {
         link: ctaLink.trim(),
       } : undefined;
 
-      await createLeadMagnet({
+      const result = await createLeadMagnet({
         title: title.trim(),
         description: description.trim() || undefined,
         type,
@@ -146,6 +168,42 @@ export function CreateLeadMagnet() {
         fields,
         cta: ctaData,
       });
+
+      // Capture screenshot after successful creation
+      console.log('📄 Result:', result);
+      
+      // Handle both old format (just ID) and new format ({ id, shareId })
+      let leadMagnetId, shareId;
+      
+      if (typeof result === 'string') {
+        // Old format - just the ID
+        leadMagnetId = result;
+        console.log('📄 Using old format, need to get shareId');
+        // Get the shareId from the created lead magnet
+        try {
+          const shareId = await getShareId({ id: leadMagnetId as any });
+          if (shareId) {
+            console.log('✅ ShareId retrieved:', shareId);
+            console.log('📸 Lead magnet created, capturing screenshot...');
+            // Capture screenshot in background (don't wait for it)
+            captureScreenshot(leadMagnetId, shareId);
+          } else {
+            console.log('⚠️ Could not get shareId from lead magnet');
+          }
+        } catch (error) {
+          console.log('⚠️ Error getting shareId:', error);
+        }
+      } else if (result?.id && result?.shareId) {
+        // New format - object with id and shareId
+        leadMagnetId = result.id;
+        shareId = result.shareId;
+        console.log('✅ ShareId available:', shareId);
+        console.log('📸 Lead magnet created, capturing screenshot...');
+        // Capture screenshot in background (don't wait for it)
+        captureScreenshot(leadMagnetId, shareId);
+      } else {
+        console.log('❌ Unexpected result format:', result);
+      }
 
       toast.success("Lead magnet created successfully!");
       navigate("/lead-magnets");

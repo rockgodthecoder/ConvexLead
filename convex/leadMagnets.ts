@@ -27,9 +27,16 @@ export const list = query({
           .collect()
           .then((engagements) => engagements.length);
 
+        const sessionsCount = await ctx.db
+          .query("analyticsSessions")
+          .withIndex("by_document", (q) => q.eq("documentId", magnet._id))
+          .collect()
+          .then((sessions) => sessions.length);
+
         return {
           ...magnet,
           leadsCount,
+          sessionsCount,
           fileUrl: magnet.fileId ? await ctx.storage.getUrl(magnet.fileId) : null,
         };
       })
@@ -118,12 +125,14 @@ export const create = mutation({
       shareId = generateShareId();
     }
 
-    return await ctx.db.insert("leadMagnets", {
+    const magnetId = await ctx.db.insert("leadMagnets", {
       ...args,
       createdBy: userId,
       isActive: true,
       shareId,
     });
+    
+    return { id: magnetId, shareId };
   },
 });
 
@@ -204,6 +213,23 @@ export const generateUploadUrl = mutation({
     }
 
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const getShareId = mutation({
+  args: { id: v.id("leadMagnets") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const magnet = await ctx.db.get(args.id);
+    if (!magnet || magnet.createdBy !== userId) {
+      throw new Error("Lead magnet not found or unauthorized");
+    }
+
+    return magnet.shareId;
   },
 });
 

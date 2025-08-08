@@ -31,6 +31,9 @@ const applicationTables = {
       buttonText: v.string(),
       link: v.string(),
     })),
+    // Base screenshot for heatmap generation
+    baseScreenshotFileId: v.optional(v.id("_storage")),
+    baseScreenshotCapturedAt: v.optional(v.number()),
   })
     .index("by_user", ["createdBy"])
     .index("by_user_and_active", ["createdBy", "isActive"])
@@ -67,15 +70,12 @@ const applicationTables = {
     userId: v.optional(v.string()),
     leadId: v.optional(v.id("leads")),
     userAgent: v.string(),
-    referrer: v.optional(v.string()),
     startTime: v.number(),
     endTime: v.number(),
     duration: v.number(),
     maxScrollPercentage: v.number(),
     scrollEventCount: v.optional(v.number()),
-    scrollEventsFileId: v.optional(v.id("_storage")),
     viewport: v.object({ width: v.number(), height: v.number() }),
-    processed: v.optional(v.boolean()),
     createdAt: v.number(),
     email: v.optional(v.string()),
     // CTA Click Tracking

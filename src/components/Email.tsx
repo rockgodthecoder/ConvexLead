@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+// Email functionality temporarily disabled
 export function Email() {
   const [activeTab, setActiveTab] = useState<"flow" | "custom">("flow");
 
@@ -10,6 +11,13 @@ export function Email() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Email Campaigns</h1>
           <p className="text-gray-600 mt-1">Manage your email flows and custom campaigns</p>
+          <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-600">⚠️</span>
+              <span className="text-sm text-yellow-800 font-medium">Email functionality is temporarily disabled</span>
+            </div>
+            <p className="text-xs text-yellow-700 mt-1">This feature is currently inactive and will be re-enabled in a future update.</p>
+          </div>
         </div>
       </div>
 

@@ -14,7 +14,7 @@ import { Analytics } from "./components/Analytics";
 import { SharePage } from "./components/SharePage";
 import { CreateLeadMagnet } from "./pages/CreateLeadMagnet";
 import { MyPage } from "./components/MyPage";
-import { Email } from "./components/Email";
+// import { Email } from "./components/Email";
 
 export default function App() {
   return (
@@ -96,7 +96,8 @@ function Content({ currentView, onCollapseSidebar }: { currentView: "home" | "le
         {currentView === "lead-magnets" && <LeadMagnetDashboard onCollapseSidebar={onCollapseSidebar} />}
         {currentView === "leads" && <Leads />}
         {currentView === "analytics" && <Analytics />}
-        {currentView === "email" && <Email />}
+        {/* Email functionality temporarily disabled */}
+        {/* {currentView === "email" && <Email />} */}
         {currentView === "my-page" && <MyPage />}
       </Authenticated>
       

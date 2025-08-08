@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -40,6 +40,167 @@ function LeadWatchTimeCell({ magnetId, email }: { magnetId: Id<'leadMagnets'>, e
   );
 }
 
+// Base Screenshot Viewer Component
+interface BaseScreenshotViewerProps {
+  documentId: Id<"leadMagnets">;
+}
+
+function BaseScreenshotViewer({ documentId }: BaseScreenshotViewerProps) {
+  const baseScreenshot = useQuery(api.analytics.getBaseScreenshot, {
+    documentId,
+  });
+
+  if (baseScreenshot === undefined) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600">Loading screenshot...</span>
+      </div>
+    );
+  }
+
+  if (!baseScreenshot) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-4xl mb-4">📸</div>
+        <h3 className="text-lg font-medium text-gray-700 mb-2">No Screenshot Available</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          This lead magnet doesn't have a base screenshot yet.
+        </p>
+        <div className="text-xs text-gray-400">
+          Screenshots are captured automatically when lead magnets are created.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">
+            Captured on: {baseScreenshot.capturedAt ? new Date(baseScreenshot.capturedAt).toLocaleString() : 'Unknown'}
+          </p>
+        </div>
+        <a
+          href={baseScreenshot.url || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+        >
+          🔗 Open Full Size
+        </a>
+      </div>
+      
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <img
+          src={baseScreenshot.url}
+          alt="Lead magnet base screenshot"
+          className="w-full h-auto max-h-96 object-contain"
+          style={{ backgroundColor: '#f9fafb' }}
+        />
+      </div>
+      
+      <div className="text-xs text-gray-500">
+        This screenshot is used as the base for heatmap visualizations.
+      </div>
+    </div>
+  );
+}
+
+// Heatmap Component
+interface HeatmapOverlayProps {
+  baseScreenshotUrl: string | null;
+  pixelBins: Array<{ y: number; timeSpent: number }>;
+  isLoading?: boolean;
+}
+
+function HeatmapOverlay({ baseScreenshotUrl, pixelBins, isLoading = false }: HeatmapOverlayProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!baseScreenshotUrl || !canvasRef.current || pixelBins.length === 0) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      // Set canvas size to match image
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw base image
+      ctx.drawImage(img, 0, 0);
+      
+      // Draw heatmap overlay
+      const maxScore = Math.max(...pixelBins.map(bin => bin.timeSpent));
+      
+      pixelBins.forEach((bin) => {
+        if (bin.timeSpent > 0) {
+          const intensity = maxScore > 0 ? (bin.timeSpent / maxScore) : 0;
+          const opacity = Math.min(intensity * 0.7, 0.7); // Max 70% opacity
+          
+          ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
+          ctx.fillRect(0, bin.y, canvas.width, 25); // 25px bin height
+        }
+      });
+      
+      setImageLoaded(true);
+    };
+    
+    img.onerror = () => {
+      console.error('Failed to load base screenshot');
+    };
+    
+    img.src = baseScreenshotUrl;
+  }, [baseScreenshotUrl, pixelBins]);
+
+  if (isLoading) {
+    return (
+      <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 h-full flex items-center justify-center min-h-[300px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-sm text-gray-600">Loading heatmap...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!baseScreenshotUrl) {
+    return (
+      <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 h-full flex items-center justify-center min-h-[300px]">
+        <div className="text-center">
+          <div className="text-4xl mb-4">📸</div>
+          <h4 className="text-lg font-medium text-gray-700 mb-2">No Base Screenshot</h4>
+          <p className="text-sm text-gray-500">
+            Base screenshot not available for this lead magnet.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-auto border border-gray-200 rounded-lg"
+        style={{ maxHeight: '500px' }}
+      />
+      {imageLoaded && (
+        <div className="mt-2 text-xs text-gray-600">
+          Heatmap overlay showing engagement intensity (red = high engagement)
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Session Details Modal Component
 interface SessionDetailsModalProps {
   isOpen: boolean;
@@ -50,13 +211,40 @@ interface SessionDetailsModalProps {
     lastName?: string;
     totalTimeSpent: number;
     maxScrollPercentage: number;
-    ctaClicks: number;
+    ctaClicks: number | string;
     firstEngagement?: number;
     lastEngagement?: number;
   };
+  magnetId?: Id<"leadMagnets">;
 }
 
-function SessionDetailsModal({ isOpen, onClose, sessionData }: SessionDetailsModalProps) {
+function SessionDetailsModal({ isOpen, onClose, sessionData, magnetId }: SessionDetailsModalProps) {
+  // Fetch base screenshot and session data for heatmap
+  const baseScreenshot = useQuery(api.analytics.getBaseScreenshot, {
+    documentId: magnetId || "temp" as any,
+  });
+  
+  // Fetch sessions for this lead magnet to aggregate pixel bins
+  const sessions = useQuery(api.analytics.getSessionsForLeadMagnet, {
+    leadMagnetId: magnetId || "temp" as any,
+    limit: 100,
+  });
+
+  // Aggregate pixel bins from all sessions
+  const aggregatedPixelBins = sessions?.reduce((bins, session) => {
+    if (session.pixelBins) {
+      session.pixelBins.forEach((bin) => {
+        const existingBin = bins.find(b => b.y === bin.y);
+        if (existingBin) {
+          existingBin.timeSpent += bin.timeSpent;
+        } else {
+          bins.push({ y: bin.y, timeSpent: bin.timeSpent });
+        }
+      });
+    }
+    return bins;
+  }, [] as Array<{ y: number; timeSpent: number }>) || [];
+
   if (!isOpen) return null;
 
   return (
@@ -91,24 +279,12 @@ function SessionDetailsModal({ isOpen, onClose, sessionData }: SessionDetailsMod
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Engagement Heatmap</h3>
               <p className="text-sm text-gray-600">Scroll depth and time spent analysis</p>
             </div>
-            {/* Heatmap Placeholder */}
-            <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 h-full flex items-center justify-center min-h-[300px]">
-              <div className="text-center">
-                <div className="text-4xl mb-4">🔥</div>
-                <h4 className="text-lg font-medium text-gray-700 mb-2">Heatmap Visualization</h4>
-                <p className="text-sm text-gray-500 max-w-md">
-                  This area will show a detailed heatmap of user engagement, 
-                  including scroll patterns, time spent on each section, 
-                  and interaction hotspots.
-                </p>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-700">
-                    <strong>Placeholder:</strong> Heatmap will display scroll depth (0-100%) 
-                    with color intensity showing time spent at each position.
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* Heatmap Component */}
+            <HeatmapOverlay
+              baseScreenshotUrl={baseScreenshot?.url || null}
+              pixelBins={aggregatedPixelBins}
+              isLoading={baseScreenshot === undefined || sessions === undefined}
+            />
           </div>
 
           {/* Right Side - Analytics */}
@@ -205,7 +381,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [activeTab, setActiveTab] = useState<'overall' | 'sessions' | 'heatmap' | 'edit' | 'share'>('overall');
+  const [activeTab, setActiveTab] = useState<'overall' | 'sessions' | 'share'>('overall');
   const [dateFilter, setDateFilter] = useState<'all' | '7' | '30' | '90'>('all');
   const [trendsFilter, setTrendsFilter] = useState<'all' | '7' | '30' | '90'>('all');
   const [showContentPopup, setShowContentPopup] = useState(false);
@@ -216,6 +392,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
   const leads = useQuery(api.leads.list, { leadMagnetId: magnetId });
   const exportLeads = useQuery(api.leads.exportLeads, { leadMagnetId: magnetId });
   const sessions = useQuery(api.analytics.getSessionsForLeadMagnet, { leadMagnetId: magnetId });
+  const averageViewTime = useQuery(api.analytics.getAverageViewTime, { leadMagnetId: magnetId });
   
   const updateMagnet = useMutation(api.leadMagnets.update);
   const deleteMagnet = useMutation(api.leadMagnets.remove);
@@ -505,26 +682,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
             >
               Sessions
             </button>
-                <button
-              onClick={() => setActiveTab('heatmap')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'heatmap'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-                >
-              Heatmap Analytics
-                </button>
-                <button
-              onClick={() => setActiveTab('edit')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'edit'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-                >
-              Edit Content
-                </button>
+    
                 <button
               onClick={() => setActiveTab('share')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -601,10 +759,16 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
                   <div className="text-xs text-gray-500 mb-1">Conversion Rate</div>
                   <div className="text-3xl font-bold text-gray-900">{analytics.conversionRate}%</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col items-center opacity-60">
-                  <div className="text-xs text-gray-400 mb-1">Avg. View Time</div>
-                  <div className="text-3xl font-bold text-gray-400">--</div>
-                  <div className="text-xs text-gray-400 mt-1">Coming Soon</div>
+                <div className="bg-white rounded-lg shadow-sm border p-6 flex flex-col items-center">
+                  <div className="text-xs text-gray-500 mb-1">Avg. View Time</div>
+                  <div className="text-3xl font-bold text-gray-900">
+                    {averageViewTime ? formatDuration(averageViewTime.averageViewTime) : '--'}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {averageViewTime && averageViewTime.totalSessions > 0 
+                      ? `${averageViewTime.totalSessions} sessions` 
+                      : 'No sessions yet'}
+                  </div>
                 </div>
               </div>
               <div className="mb-4 flex items-center justify-between">
@@ -631,6 +795,102 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
           </div>
               {/* Trends chart (leads over time) */}
               <TrendsChart trends={filteredTrends} />
+            </div>
+            
+            {/* --- Other Details Section --- */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">📋 Other Details</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Included Fields */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Included Fields</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
+                      <span className="text-sm text-gray-600">Email</span>
+                      <span className="text-sm font-medium text-green-600">✓ Required</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
+                      <span className="text-sm text-gray-600">First Name</span>
+                      <span className={`text-sm font-medium ${magnet.fields?.firstName ? 'text-green-600' : 'text-gray-400'}`}>
+                        {magnet.fields?.firstName ? '✓ Included' : '✗ Not included'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
+                      <span className="text-sm text-gray-600">Last Name</span>
+                      <span className={`text-sm font-medium ${magnet.fields?.lastName ? 'text-green-600' : 'text-gray-400'}`}>
+                        {magnet.fields?.lastName ? '✓ Included' : '✗ Not included'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
+                      <span className="text-sm text-gray-600">Phone</span>
+                      <span className={`text-sm font-medium ${magnet.fields?.phone ? 'text-green-600' : 'text-gray-400'}`}>
+                        {magnet.fields?.phone ? '✓ Included' : '✗ Not included'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
+                      <span className="text-sm text-gray-600">Company</span>
+                      <span className={`text-sm font-medium ${magnet.fields?.company ? 'text-green-600' : 'text-gray-400'}`}>
+                        {magnet.fields?.company ? '✓ Included' : '✗ Not included'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* CTA Status */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Call-to-Action (CTA)</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md">
+                      <span className="text-sm text-gray-600">CTA Status</span>
+                      <span className={`text-sm font-medium ${magnet.cta ? 'text-green-600' : 'text-gray-400'}`}>
+                        {magnet.cta ? '✓ Configured' : '✗ Not configured'}
+                      </span>
+                    </div>
+                    
+                    {/* CTA Text */}
+                    <div className="bg-gray-50 rounded-md p-3">
+                      <div className="text-sm text-gray-600 mb-1">CTA Text</div>
+                      <div className="text-sm font-medium text-gray-900 break-words">
+                        {magnet.cta?.mainText || 'Not set'}
+                      </div>
+                    </div>
+                    
+                    {/* Description */}
+                    <div className="bg-gray-50 rounded-md p-3">
+                      <div className="text-sm text-gray-600 mb-1">Description</div>
+                      <div className="text-sm font-medium text-gray-900 break-words">
+                        {magnet.cta?.description || 'Not set'}
+                      </div>
+                    </div>
+                    
+                    {/* Button Text */}
+                    <div className="bg-gray-50 rounded-md p-3">
+                      <div className="text-sm text-gray-600 mb-1">Button Text</div>
+                      <div className="text-sm font-medium text-gray-900 break-words">
+                        {magnet.cta?.buttonText || 'Not set'}
+                      </div>
+                    </div>
+                    
+                    {/* CTA Link */}
+                    <div className="bg-gray-50 rounded-md p-3">
+                      <div className="text-sm text-gray-600 mb-1">CTA Link</div>
+                      {magnet.cta?.link ? (
+                        <a 
+                          href={magnet.cta.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 underline break-all"
+                          title={magnet.cta.link}
+                        >
+                          {magnet.cta.link}
+                        </a>
+                      ) : (
+                        <span className="text-sm font-medium text-gray-400">Not set</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -719,7 +979,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
                       }
                     </td>
                     <td className="py-2 px-3">
-                      {session.ctaClicks || 0}
+                      {magnet.cta ? (session.ctaClicks || 0) : "N/A"}
                     </td>
                     <td className="py-2 px-3">
                       <button
@@ -730,7 +990,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
                             lastName: session.lead?.lastName,
                             totalTimeSpent: session.duration ?? 0,
                             maxScrollPercentage: session.maxScrollPercentage ?? 0,
-                            ctaClicks: session.ctaClicks ?? 0,
+                            ctaClicks: magnet.cta ? (session.ctaClicks ?? 0) : "N/A",
                             firstEngagement: session.startTime,
                             lastEngagement: session.endTime,
                           });
@@ -752,19 +1012,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
           </div>
         )}
 
-        {activeTab === 'heatmap' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold mb-4">Heatmap Analytics</h2>
-            <div className="text-gray-600">Heatmap analytics coming soon...</div>
-          </div>
-        )}
 
-        {activeTab === 'edit' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold mb-4">Edit Content</h2>
-            <div className="text-gray-600">Content editing UI coming soon...</div>
-          </div>
-        )}
 
         {activeTab === 'share' && (
           <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
@@ -868,6 +1116,7 @@ export function LeadMagnetDetails({ magnetId, onBack, onCollapseSidebar }: LeadM
         isOpen={showSessionModal}
         onClose={() => setShowSessionModal(false)}
         sessionData={selectedSession}
+        magnetId={magnetId}
       />
     </div>
   );
